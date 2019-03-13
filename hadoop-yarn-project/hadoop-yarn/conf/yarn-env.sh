@@ -104,7 +104,7 @@ fi
 # restore ordinary behaviour
 unset IFS
 
-
+YARN_OPTS="$YARN_OPTS -Djute.maxbuffer=4096"
 YARN_OPTS="$YARN_OPTS -Dhadoop.log.dir=$YARN_LOG_DIR"
 YARN_OPTS="$YARN_OPTS -Dyarn.log.dir=$YARN_LOG_DIR"
 YARN_OPTS="$YARN_OPTS -Dhadoop.log.file=$YARN_LOGFILE"
