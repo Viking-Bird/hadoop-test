@@ -658,8 +658,11 @@ public class ZKRMStateStore extends RMStateStore {
             LOG.debug("Storing final state info for app: " + appId + " at: "
                     + nodeUpdatePath);
         }
+
+        // RM状态字节数组
         byte[] appStateData = appStateDataPB.getProto().toByteArray();
 
+        // 调用重试逻辑写数据
         if (existsWithRetries(nodeUpdatePath, true) != null) {
             setDataWithRetries(nodeUpdatePath, appStateData, -1);
         } else {
@@ -716,10 +719,11 @@ public class ZKRMStateStore extends RMStateStore {
     @Override
     public synchronized void removeApplicationStateInternal(ApplicationState appState)
             throws Exception {
-        String appId = appState.getAppId().toString();
-        String appIdRemovePath = getNodePath(rmAppRoot, appId);
+        String appId = appState.getAppId().toString(); // 获取应用ID
+        String appIdRemovePath = getNodePath(rmAppRoot, appId); // 根据应用ID获取对应的路径
         ArrayList<Op> opList = new ArrayList<Op>();
 
+        // 执行状态信息删除操作
         for (ApplicationAttemptId attemptId : appState.attempts.keySet()) {
             String attemptRemovePath = getNodePath(appIdRemovePath, attemptId.toString());
             opList.add(Op.delete(attemptRemovePath, -1));
@@ -1171,7 +1175,7 @@ public class ZKRMStateStore extends RMStateStore {
                     retry++; // 累计重试次数
 
                     /**
-                     * 在未达到最大重试次数的条件的下，根据ZK Server返回的错误码执行不通的重试策略
+                     * 在未达到最大重试次数的条件的下，根据ZK Server返回的错误码执行不同的重试策略
                      */
                     if (shouldRetry(ke.code()) && retry < numRetries) { // 如果ZK Server返回的错误码为连接丢失、连接超时，则直接进行重试
                         LOG.info("Retrying operation on ZK. Retry no. " + retry);
@@ -1186,7 +1190,7 @@ public class ZKRMStateStore extends RMStateStore {
                         syncInternal(ke.getPath());
                         continue;
                     }
-                    LOG.info("Maxed out ZK retries. Giving up!");
+                    LOG.info("Maxed out ZK retries. Giving up!"); // 达到最大重试次数，放弃重试，抛出异常
                     throw ke;
                 }
             }
