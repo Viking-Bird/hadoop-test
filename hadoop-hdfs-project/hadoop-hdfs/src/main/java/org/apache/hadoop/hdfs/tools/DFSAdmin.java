@@ -813,6 +813,7 @@ public class DFSAdmin extends FsShell {
   /**
    * Command to ask the namenode to set the balancer bandwidth for all of the
    * datanodes.
+   * 使NameNode给所有DataNode设置数据平衡所需要的带宽
    * Usage: hdfs dfsadmin -setBalancerBandwidth bandwidth
    * @param argv List of of command line parameters.
    * @param idx The index of the command that is being processed.
@@ -822,6 +823,7 @@ public class DFSAdmin extends FsShell {
     long bandwidth;
     int exitCode = -1;
 
+    // 获取带宽设置数值
     try {
       bandwidth = Long.parseLong(argv[idx]);
     } catch (NumberFormatException nfe) {
@@ -842,6 +844,7 @@ public class DFSAdmin extends FsShell {
     URI dfsUri = dfs.getUri();
     boolean isHaEnabled = HAUtil.isLogicalUri(dfsConf, dfsUri);
 
+    // 设置带宽信息
     if (isHaEnabled) {
       String nsId = dfsUri.getHost();
       List<ProxyAndInfo<ClientProtocol>> proxies =
