@@ -118,7 +118,7 @@ public class Dispatcher {
   private final ExecutorService dispatchExecutor;
 
   /** The maximum number of concurrent blocks moves at a datanode */
-  private final int maxConcurrentMovesPerNode;
+  private final int maxConcurrentMovesPerNode; // 在DataNode上移动的最大并发块数
 
   private static class GlobalBlockMap {
     private final Map<Block, DBlock> map = new HashMap<Block, DBlock>();
