@@ -29,7 +29,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 /**
  * This interface is the one implemented by the schedulers. It mainly extends 
  * {@link YarnScheduler}. 
- *
+ * 所有资源调度器都要实现的接口
  */
 @LimitedPrivate("yarn")
 @Evolving

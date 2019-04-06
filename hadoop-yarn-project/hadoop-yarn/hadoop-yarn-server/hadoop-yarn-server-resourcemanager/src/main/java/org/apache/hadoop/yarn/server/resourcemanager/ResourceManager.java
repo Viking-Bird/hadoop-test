@@ -171,7 +171,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   private Configuration conf;
 
   private UserGroupInformation rmLoginUGI;
-  
+
   public ResourceManager() {
     super("ResourceManager");
   }
@@ -193,7 +193,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected void serviceInit(Configuration conf) throws Exception {
     this.conf = conf;
     this.rmContext = new RMContextImpl();
-    
+
     this.configurationProvider =
         ConfigurationProviderFactory.getConfigurationProvider(conf);
     this.configurationProvider.init(this.conf);
@@ -226,13 +226,13 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
 
     validateConfigs(this.conf);
-    
+
     // Set HA configuration should be done before login
     this.rmContext.setHAEnabled(HAUtil.isHAEnabled(this.conf));
     if (this.rmContext.isHAEnabled()) {
       HAUtil.verifyAndSetConfiguration(this.conf);
     }
-    
+
     // Set UGI and do login
     // If security is enabled, use login user
     // If security is not enabled, use current user
@@ -253,7 +253,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     rmContext.setRMAdminService(adminService);
 
     rmContext.setYarnConfiguration(conf);
-    
+
     createAndInitActiveServices();
 
     webAppAddress = WebAppUtils.getWebAppBindURL(this.conf,
@@ -271,7 +271,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     super.serviceInit(this.conf);
   }
-  
+
   protected QueueACLsManager createQueueACLsManager(ResourceScheduler scheduler,
       Configuration conf) {
     return new QueueACLsManager(scheduler, conf);
@@ -292,6 +292,10 @@ public class ResourceManager extends CompositeService implements Recoverable {
     return new AsyncDispatcher();
   }
 
+  /**
+   * 根据用户scheduler.class配置创建资源调度器对象
+   * @return
+   */
   protected ResourceScheduler createScheduler() {
     String schedulerClassName = conf.get(YarnConfiguration.RM_SCHEDULER,
         YarnConfiguration.DEFAULT_RM_SCHEDULER);
@@ -346,7 +350,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   protected AMLivelinessMonitor createAMLivelinessMonitor() {
     return new AMLivelinessMonitor(this.rmDispatcher);
   }
-  
+
   protected RMNodeLabelsManager createNodeLabelManager()
       throws InstantiationException, IllegalAccessException {
     Class<? extends RMNodeLabelsManager> nlmCls =
@@ -354,7 +358,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
             MemoryRMNodeLabelsManager.class, RMNodeLabelsManager.class);
     return nlmCls.newInstance();
   }
-  
+
   protected DelegationTokenRenewer createDelegationTokenRenewer() {
     return new DelegationTokenRenewer();
   }
@@ -369,7 +373,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
 
   protected SystemMetricsPublisher createSystemMetricsPublisher() {
-    return new SystemMetricsPublisher(); 
+    return new SystemMetricsPublisher();
   }
 
   // sanity check for configurations
@@ -438,7 +442,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       AMLivelinessMonitor amFinishingMonitor = createAMLivelinessMonitor();
       addService(amFinishingMonitor);
       rmContext.setAMFinishingMonitor(amFinishingMonitor);
-      
+
       RMNodeLabelsManager nlm = createNodeLabelManager();
       nlm.setRMContext(rmContext);
       addService(nlm);
@@ -486,7 +490,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       addService(nodesListManager);
       rmContext.setNodesListManager(nodesListManager);
 
-      // Initialize the scheduler
+      // Initialize the scheduler  初始化调度器
       scheduler = createScheduler();
       scheduler.setRMContext(rmContext);
       addIfService(scheduler);
@@ -688,7 +692,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
             scheduler.handle(event);
           } catch (Throwable t) {
             // An error occurred, but we are shutting down anyway.
-            // If it was an InterruptedException, the very act of 
+            // If it was an InterruptedException, the very act of
             // shutdown could have caused it and is probably harmless.
             if (stopped) {
               LOG.warn("Exception during shutdown: ", t);
@@ -873,7 +877,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       }
     }
   }
-  
+
   protected void startWepApp() {
 
     // Use the customized yarn filter instead of the standard kerberos filter to
@@ -940,7 +944,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       }
     }
 
-    // if security is not enabled and the default filter initializer has not 
+    // if security is not enabled and the default filter initializer has not
     // been set, set the initializer to include the
     // RMAuthenticationFilterInitializer which in turn will set up the simple
     // auth filter.
@@ -959,7 +963,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       }
     }
 
-    Builder<ApplicationMasterService> builder = 
+    Builder<ApplicationMasterService> builder =
         WebApps
             .$for("cluster", ApplicationMasterService.class, masterService,
                 "ws")
@@ -1092,7 +1096,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
     super.serviceStart();
   }
-  
+
   protected void doSecureLogin() throws IOException {
 	InetSocketAddress socAddr = getBindAddress(conf);
     SecurityUtil.login(this.conf, YarnConfiguration.RM_KEYTAB,
@@ -1119,7 +1123,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     transitionToStandby(false);
     rmContext.setHAServiceState(HAServiceState.STOPPING);
   }
-  
+
   protected ResourceTrackerService createResourceTrackerService() {
     return new ResourceTrackerService(this.rmContext, this.nodesListManager,
         this.nmLivelinessMonitor,
@@ -1149,7 +1153,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   public ClientRMService getClientRMService() {
     return this.clientRM;
   }
-  
+
   /**
    * return the scheduler.
    * @return the scheduler for the Resource Manager.
@@ -1259,7 +1263,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
   /**
    * Retrieve RM bind address from configuration
-   * 
+   *
    * @param conf
    * @return InetSocketAddress
    */

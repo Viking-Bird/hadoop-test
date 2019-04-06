@@ -54,10 +54,12 @@ import org.apache.hadoop.yarn.proto.YarnServiceProtos.SchedulerResourceTypes;
 public interface YarnScheduler extends EventHandler<SchedulerEvent> {
 
   /**
+   * 获取一个队列的基本信息
+   *
    * Get queue information
-   * @param queueName queue name
-   * @param includeChildQueues include child queues?
-   * @param recursive get children queues?
+   * @param queueName queue name 队列名称
+   * @param includeChildQueues include child queues? 表示是否包含子队列
+   * @param recursive get children queues? 表示是否递归返回其子队列的信息
    * @return queue information
    * @throws IOException
    */
@@ -67,6 +69,8 @@ public interface YarnScheduler extends EventHandler<SchedulerEvent> {
       boolean recursive) throws IOException;
 
   /**
+   * 返回当前用户的队列ACL权限
+   *
    * Get acls for queues for current user.
    * @return acls for queues for current user
    */
@@ -75,6 +79,8 @@ public interface YarnScheduler extends EventHandler<SchedulerEvent> {
   public List<QueueUserACLInfo> getQueueUserAclInfo();
 
   /**
+   * 返回集群的全部资源容量
+   *
    * Get the whole resource capacity of the cluster.
    * @return the whole resource capacity of the cluster.
    */
@@ -83,6 +89,8 @@ public interface YarnScheduler extends EventHandler<SchedulerEvent> {
   public Resource getClusterResource();
 
   /**
+   * 返回调度器最少可分配的资源
+   *
    * Get minimum allocatable {@link Resource}.
    * @return minimum allocatable resource
    */
@@ -91,6 +99,8 @@ public interface YarnScheduler extends EventHandler<SchedulerEvent> {
   public Resource getMinimumResourceCapability();
   
   /**
+   * 返回调度器最多可分配的资源
+   *
    * Get maximum allocatable {@link Resource}.
    * @return maximum allocatable resource
    */
@@ -99,6 +109,8 @@ public interface YarnScheduler extends EventHandler<SchedulerEvent> {
   public Resource getMaximumResourceCapability();
 
   /**
+   * 返回当前可用节点的总数
+   *
    * Get the number of nodes available in the cluster.
    * @return the number of available nodes.
    */
@@ -107,6 +119,8 @@ public interface YarnScheduler extends EventHandler<SchedulerEvent> {
   public int getNumClusterNodes();
   
   /**
+   * ApplicationMaster和资源调度器之间最主要的API
+   *
    * The main api between the ApplicationMaster and the Scheduler.
    * The ApplicationMaster is updating his future resource requirements
    * and may release containers he doens't need.
