@@ -91,6 +91,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <javadocExecutable>${java.home}/../bin/javadoc</javadocExecutable>
+    <additionalparam>-Xdoclint:none</additionalparam>
   </properties>
 
   <modules>
