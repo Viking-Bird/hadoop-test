@@ -44,6 +44,8 @@ public class FifoPolicy extends SchedulingPolicy {
   }
 
   /**
+   * 按照优先级高低比较：1、优先级相同，按提交时间先后顺序进行比较；2、如果提交时间相同，按照名称（队列或应用程序名称）大小（字符串比较）进行比较
+   *
    * Compare Schedulables in order of priority and then submission time, as in
    * the default FIFO scheduler in Hadoop.
    */

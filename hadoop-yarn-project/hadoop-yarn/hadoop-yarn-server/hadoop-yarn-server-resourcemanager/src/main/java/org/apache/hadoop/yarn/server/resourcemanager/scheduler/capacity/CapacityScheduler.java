@@ -287,7 +287,7 @@ public class CapacityScheduler extends
     validateConf(this.conf);
     this.minimumAllocation = this.conf.getMinimumAllocation();
     this.maximumAllocation = this.conf.getMaximumAllocation();
-    this.calculator = this.conf.getResourceCalculator();
+    this.calculator = this.conf.getResourceCalculator(); // Yarn资源调度比较器
     this.usePortForNodeName = this.conf.getUsePortForNodeName();
     this.applications =
         new ConcurrentHashMap<ApplicationId,
@@ -296,11 +296,11 @@ public class CapacityScheduler extends
 
     initializeQueues(this.conf);
 
-    scheduleAsynchronously = this.conf.getScheduleAynschronously();
+    scheduleAsynchronously = this.conf.getScheduleAynschronously(); // 异步调度
     asyncScheduleInterval =
         this.conf.getLong(ASYNC_SCHEDULER_INTERVAL,
             DEFAULT_ASYNC_SCHEDULER_INTERVAL);
-    if (scheduleAsynchronously) {
+    if (scheduleAsynchronously) { // 如果启用异步调度，则初始化异步调度守护线程
       asyncSchedulerThread = new AsyncScheduleThread(this);
     }
 

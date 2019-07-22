@@ -287,11 +287,11 @@ public class FairScheduler extends
     }
   }
 
-  /**
-   * Recompute the internal variables used by the scheduler - per-job weights,
-   * fair shares, deficits, minimum slot allocations, and amount of used and
-   * required resources per job.
-   */
+    /**
+     * Recompute the internal variables used by the scheduler - per-job weights,
+     * fair shares, deficits, minimum slot allocations, and amount of used and
+     * required resources per job.
+     */
   protected synchronized void update() {
     long start = getClock().getTime();
     updateStarvationStats(); // Determine if any queues merit preemption

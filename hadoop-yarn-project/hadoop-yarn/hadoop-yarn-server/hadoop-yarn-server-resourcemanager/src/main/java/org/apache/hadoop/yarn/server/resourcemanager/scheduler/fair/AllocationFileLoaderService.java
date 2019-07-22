@@ -193,6 +193,8 @@ public class AllocationFileLoaderService extends AbstractService {
   }
   
   /**
+   * 加载默认配置
+   *
    * Updates the allocation list from the allocation config file. This file is
    * expected to be in the XML format specified in the design doc.
    *
@@ -381,6 +383,8 @@ public class AllocationFileLoaderService extends AbstractService {
   }
   
   /**
+   * 加载队列内配置
+   *
    * Loads a queue from a queue element in the configuration file
    */
   private void loadQueue(String parentName, Element element,

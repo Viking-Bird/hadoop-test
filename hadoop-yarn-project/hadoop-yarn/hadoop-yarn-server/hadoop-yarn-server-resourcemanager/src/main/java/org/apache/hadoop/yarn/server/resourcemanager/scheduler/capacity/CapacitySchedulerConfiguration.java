@@ -64,7 +64,7 @@ public class CapacitySchedulerConfiguration extends Configuration {
   
   @Private
   public static final String MAXIMUM_APPLICATIONS_SUFFIX =
-    "maximum-applications";
+    "maximum-applications"; // 集群或者队列中同时处于等待和运行状态的应用程序数目上限，这是一个强限制，一旦集群中应用程序数目超过该上限，后续提交的应用程序将被拒绝，默认值为10000。
   
   @Private
   public static final String MAXIMUM_SYSTEM_APPLICATIONS =
@@ -72,7 +72,7 @@ public class CapacitySchedulerConfiguration extends Configuration {
   
   @Private
   public static final String MAXIMUM_AM_RESOURCE_SUFFIX =
-    "maximum-am-resource-percent";
+    "maximum-am-resource-percent"; // 集群中用于运行应用程序ApplicationMaster的资源比例上限，该参数通常用于限制处于活动状态的应用程序数目。
   
   @Private
   public static final String MAXIMUM_APPLICATION_MASTERS_RESOURCE_PERCENT =
@@ -85,13 +85,13 @@ public class CapacitySchedulerConfiguration extends Configuration {
   public static final String CAPACITY = "capacity";
   
   @Private
-  public static final String MAXIMUM_CAPACITY = "maximum-capacity";
+  public static final String MAXIMUM_CAPACITY = "maximum-capacity"; // 队列的资源使用上限（百分比）
   
   @Private
-  public static final String USER_LIMIT = "minimum-user-limit-percent";
+  public static final String USER_LIMIT = "minimum-user-limit-percent"; // 每个用户最低资源保障（百分比）
   
   @Private
-  public static final String USER_LIMIT_FACTOR = "user-limit-factor";
+  public static final String USER_LIMIT_FACTOR = "user-limit-factor"; // 每个用户最多可使用的资源量（百分比）
 
   @Private
   public static final String STATE = "state";
