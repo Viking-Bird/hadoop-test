@@ -244,6 +244,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
 
     // register the handlers for all AlwaysOn services using setupDispatcher().
+    // 注册中央事件处理器
     rmDispatcher = setupDispatcher();
     addIfService(rmDispatcher);
     rmContext.setDispatcher(rmDispatcher);
@@ -431,10 +432,12 @@ public class ResourceManager extends CompositeService implements Recoverable {
       rmSecretManagerService = createRMSecretManagerService();
       addService(rmSecretManagerService);
 
+      // 创建Container分配超时服务
       containerAllocationExpirer = new ContainerAllocationExpirer(rmDispatcher);
       addService(containerAllocationExpirer);
       rmContext.setContainerAllocationExpirer(containerAllocationExpirer);
 
+      // 创建ApplicationMaster监控服务
       AMLivelinessMonitor amLivelinessMonitor = createAMLivelinessMonitor();
       addService(amLivelinessMonitor);
       rmContext.setAMLivelinessMonitor(amLivelinessMonitor);
@@ -448,6 +451,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
       addService(nlm);
       rmContext.setNodeLabelManager(nlm);
 
+      // 根据状态恢复属性判断是不是要创建RM状态存储服务
       boolean isRecoveryEnabled = conf.getBoolean(
           YarnConfiguration.RECOVERY_ENABLED,
           YarnConfiguration.DEFAULT_RM_RECOVERY_ENABLED);
@@ -1083,9 +1087,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
   @Override
   protected void serviceStart() throws Exception {
     if (this.rmContext.isHAEnabled()) {
-      transitionToStandby(true);
+      transitionToStandby(true); //如果HA模式打开，则直接进入standBy模式，后续会通过ZK决定是否成为Active
     } else {
-      transitionToActive();
+      transitionToActive(); //如果HA模式没有打开，则直接进入Active模式
     }
 
     startWepApp();

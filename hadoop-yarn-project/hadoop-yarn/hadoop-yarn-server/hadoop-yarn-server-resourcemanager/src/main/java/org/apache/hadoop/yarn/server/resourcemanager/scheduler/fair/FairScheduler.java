@@ -268,6 +268,8 @@ public class FairScheduler extends
   }
 
   /**
+   * ContinuousSchedulingThread负责进行持续的资源调度，与NodeManager的心跳产生的调度同时进行
+   *
    * Thread which attempts scheduling resources continuously,
    * asynchronous to the node heartbeats.
    */
@@ -278,7 +280,7 @@ public class FairScheduler extends
       while (!Thread.currentThread().isInterrupted()) {
         try {
           continuousSchedulingAttempt();
-          Thread.sleep(getContinuousSchedulingSleepMs());
+          Thread.sleep(getContinuousSchedulingSleepMs()); //睡眠很短的一段时间进行下一轮调度
         } catch (InterruptedException e) {
           LOG.warn("Continuous scheduling thread interrupted. Exiting.", e);
           return;
@@ -976,12 +978,17 @@ public class FairScheduler extends
     // containers on emptier nodes first, facilitating an even spread. This
     // requires holding the scheduler lock, so that the space available on a
     // node doesn't change during the sort.
+    //进行调度以前，先对节点根据剩余资源的多少进行排序，从而让资源更充裕的节点先得到调度
+    //这样我们更容易让所有节点的资源能够被均匀分配，而不会因为某些节点总是先被调度所以总是比
+    //后调度的节点的资源使用率更高
     synchronized (this) {
       Collections.sort(nodeIdList, nodeAvailableResourceComparator);
     }
 
+    // 遍历所有节点，依次对每一个节点进行一次调度
     // iterate all nodes
     for (NodeId nodeId : nodeIdList) {
+      //FSSchedulerNode是FairScheduler视角下的一个节点
       FSSchedulerNode node = getFSSchedulerNode(nodeId);
       try {
         if (node != null && Resources.fitsIn(minimumAllocation,
@@ -1212,6 +1219,7 @@ public class FairScheduler extends
       minimumAllocation = this.conf.getMinimumAllocation();
       maximumAllocation = this.conf.getMaximumAllocation();
       incrAllocation = this.conf.getIncrementAllocation();
+      // 判断是否打开连续调度功能。默认情况下该功能关闭
       continuousSchedulingEnabled = this.conf.isContinuousSchedulingEnabled();
       continuousSchedulingSleepMs =
           this.conf.getContinuousSchedulingSleepMs();
@@ -1258,6 +1266,7 @@ public class FairScheduler extends
       updateThread.setName("FairSchedulerUpdateThread");
       updateThread.setDaemon(true);
 
+      // 如果开启了连续调度，则初始化连续调度线程
       if (continuousSchedulingEnabled) {
         // start continuous scheduling thread
         schedulingThread = new ContinuousSchedulingThread();

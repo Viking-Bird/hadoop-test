@@ -230,8 +230,8 @@ public class ZKRMStateStore extends RMStateStore {
                 conf.getInt(YarnConfiguration.RM_ZK_TIMEOUT_MS,
                         YarnConfiguration.DEFAULT_RM_ZK_TIMEOUT_MS); // ZK session超时时间，以毫秒为单位
 
-        // 重试连接ZK的时间间隔，以毫秒表示
-        if (HAUtil.isHAEnabled(conf)) {
+        // 计算重试连接ZK的时间间隔，以毫秒表示
+        if (HAUtil.isHAEnabled(conf)) { // 高可用情况下是：重试时间间隔=session超时时间/重试ZK的次数
             zkRetryInterval = zkSessionTimeout / numRetries;
         } else {
             zkRetryInterval =
@@ -246,6 +246,7 @@ public class ZKRMStateStore extends RMStateStore {
         rmAppRoot = getNodePath(zkRootNodePath, RM_APP_ROOT);
 
         /* Initialize fencing related paths, acls, and ops */
+        // 创建并删除fencingNodePath
         fencingNodePath = getNodePath(zkRootNodePath, FENCING_LOCK);
         createFencingNodePathOp = Op.create(fencingNodePath, new byte[0], zkAcl,
                 CreateMode.PERSISTENT);
@@ -291,7 +292,7 @@ public class ZKRMStateStore extends RMStateStore {
         createConnection();
 
         // ensure root dirs exist
-        createRootDir(znodeWorkingPath);
+        createRootDir(znodeWorkingPath); // 创建保存任务状态持久化节点
         createRootDir(zkRootNodePath);
         if (HAUtil.isHAEnabled(getConfig())) {
             fence();
@@ -635,6 +636,13 @@ public class ZKRMStateStore extends RMStateStore {
         LOG.debug("Done loading applications from ZK state store");
     }
 
+    /**
+     * 存储任务状态
+     *
+     * @param appId
+     * @param appStateDataPB
+     * @throws Exception
+     */
     @Override
     public synchronized void storeApplicationStateInternal(ApplicationId appId,
                                                            ApplicationStateData appStateDataPB) throws Exception {
@@ -649,6 +657,13 @@ public class ZKRMStateStore extends RMStateStore {
 
     }
 
+    /**
+     * 更新任务状态
+     *
+     * @param appId
+     * @param appStateDataPB
+     * @throws Exception
+     */
     @Override
     public synchronized void updateApplicationStateInternal(ApplicationId appId,
                                                             ApplicationStateData appStateDataPB) throws Exception {
@@ -659,7 +674,7 @@ public class ZKRMStateStore extends RMStateStore {
                     + nodeUpdatePath);
         }
 
-        // RM状态字节数组
+        // Application状态字节数组
         byte[] appStateData = appStateDataPB.getProto().toByteArray();
 
         // 调用重试逻辑写数据
@@ -673,6 +688,13 @@ public class ZKRMStateStore extends RMStateStore {
         }
     }
 
+    /**
+     * 存储任务重试信息
+     *
+     * @param appAttemptId
+     * @param attemptStateDataPB
+     * @throws Exception
+     */
     @Override
     public synchronized void storeApplicationAttemptStateInternal(
             ApplicationAttemptId appAttemptId,
@@ -691,6 +713,13 @@ public class ZKRMStateStore extends RMStateStore {
                 CreateMode.PERSISTENT);
     }
 
+    /**
+     * 更新任务重试信息
+     *
+     * @param appAttemptId
+     * @param attemptStateDataPB
+     * @throws Exception
+     */
     @Override
     public synchronized void updateApplicationAttemptStateInternal(
             ApplicationAttemptId appAttemptId,
@@ -716,6 +745,12 @@ public class ZKRMStateStore extends RMStateStore {
         }
     }
 
+
+    /**
+     * 删除application状态信息
+     * @param appState
+     * @throws Exception
+     */
     @Override
     public synchronized void removeApplicationStateInternal(ApplicationState appState)
             throws Exception {
@@ -723,7 +758,7 @@ public class ZKRMStateStore extends RMStateStore {
         String appIdRemovePath = getNodePath(rmAppRoot, appId); // 根据应用ID获取对应的路径
         ArrayList<Op> opList = new ArrayList<Op>();
 
-        // 执行状态信息删除操作
+        // 先执行application重试信息删除操作，后删除application状态信息
         for (ApplicationAttemptId attemptId : appState.attempts.keySet()) {
             String attemptRemovePath = getNodePath(appIdRemovePath, attemptId.toString());
             opList.add(Op.delete(attemptRemovePath, -1));
@@ -1017,6 +1052,11 @@ public class ZKRMStateStore extends RMStateStore {
         doMultiWithRetries(Op.setData(path, data, version));
     }
 
+
+    /**
+     * 注册watch的方法
+     */
+
     @VisibleForTesting
     @Private
     @Unstable
@@ -1070,6 +1110,10 @@ public class ZKRMStateStore extends RMStateStore {
             }
         }.runWithRetries();
     }
+
+    /**
+     * 注册watch的方法
+     */
 
     /**
      * Helper method that deletes znodes recursively

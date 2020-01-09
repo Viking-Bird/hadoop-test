@@ -763,9 +763,11 @@ public abstract class RMStateStore extends AbstractService {
    */
   @SuppressWarnings("unchecked")
   public synchronized void removeApplication(RMApp app) {
+    // 获取任务信息
     ApplicationState appState = new ApplicationState(
             app.getSubmitTime(), app.getStartTime(),
             app.getApplicationSubmissionContext(), app.getUser());
+    // 获取任务的重试信息
     for(RMAppAttempt appAttempt : app.getAppAttempts().values()) {
       Credentials credentials = getCredentialsFromAppAttempt(appAttempt);
       ApplicationAttemptState attemptState =
@@ -774,7 +776,8 @@ public abstract class RMStateStore extends AbstractService {
             appAttempt.getStartTime(), 0, 0);
       appState.attempts.put(attemptState.getAttemptId(), attemptState);
     }
-    
+
+    // 执行删除
     dispatcher.getEventHandler().handle(new RMStateStoreRemoveAppEvent(appState));
   }
 

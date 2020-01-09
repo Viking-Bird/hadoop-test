@@ -560,6 +560,7 @@ public class ApplicationMaster {
           DSEvent.DS_APP_ATTEMPT_START, domainId, appSubmitterUgi);
     }
 
+    //与ResourceManager通信，周期性发送心跳信息，包含了应用的最新信息
     AMRMClientAsync.CallbackHandler allocListener = new RMCallbackHandler();
     amRMClient = AMRMClientAsync.createAMRMClientAsync(1000, allocListener);
     amRMClient.init(conf);
@@ -576,6 +577,7 @@ public class ApplicationMaster {
     // TODO use the rpc port info to register with the RM for the client to
     // send requests to this app master
 
+    //启动之后进行AM的注册
     // Register self with ResourceManager
     // This will start heartbeating to the RM
     appMasterHostname = NetUtils.getHostname();

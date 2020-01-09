@@ -424,9 +424,12 @@ public class ApplicationMasterService extends AbstractService implements
         amrmTokenIdentifier.getApplicationAttemptId();
     ApplicationId applicationId = appAttemptId.getApplicationId();
 
+    //每次方法调用都是一次心跳信息，因此记录此次心跳信息
     this.amLivelinessMonitor.receivedPing(appAttemptId);
 
     /* check if its in cache */
+    //验证RM端是否已经有了ApplationMaster进程的attemptid信息
+    //正常情况下,ApplicationMaster对应的进程的attemp在启动的时候应该注册给AMS，即记录在responseMap中
     AllocateResponseLock lock = responseMap.get(appAttemptId);
     if (lock == null) {
       String message =
@@ -436,7 +439,11 @@ public class ApplicationMasterService extends AbstractService implements
       throw new ApplicationAttemptNotFoundException(message);
     }
     synchronized (lock) {
+      //ApplicationMaster每次与AMS交互，都会生成并记录一个AllocateResponse，AllocateResponse
+      //中记录的交互Id每次交互都会递增。从registerAppAtempt()中设置为-1，registerApplicationMaster()
+      //设置为0， 以后开始每次交互均递增
       AllocateResponse lastResponse = lock.getAllocateResponse();
+      //校验AM是否注册过
       if (!hasApplicationMasterRegistered(appAttemptId)) {
         String message =
             "AM is not registered for known application attempt: " + appAttemptId
@@ -449,10 +456,11 @@ public class ApplicationMasterService extends AbstractService implements
         throw new ApplicationMasterNotRegisteredException(message);
       }
 
+      //请求中序列号为上次请求的序列号，说明是一次重复请求，则直接返回上次的response
       if ((request.getResponseId() + 1) == lastResponse.getResponseId()) {
         /* old heartbeat */
         return lastResponse;
-      } else if (request.getResponseId() + 1 < lastResponse.getResponseId()) {
+      } else if (request.getResponseId() + 1 < lastResponse.getResponseId()) { //request里面的id是更早以前的，直接判定非法
         String message =
             "Invalid responseId in AllocateRequest from application attempt: "
                 + appAttemptId + ", expect responseId to be "
@@ -460,6 +468,7 @@ public class ApplicationMasterService extends AbstractService implements
         throw new InvalidApplicationMasterRequestException(message);
       }
 
+      //过滤非法的进度信息，进度信息用一个浮点数表示，代表进程执行的百分比
       //filter illegal progress values
       float filteredProgress = request.getProgress();
       if (Float.isNaN(filteredProgress) || filteredProgress == Float.NEGATIVE_INFINITY
@@ -470,34 +479,47 @@ public class ApplicationMasterService extends AbstractService implements
       }
 
       // Send the status update to the appAttempt.
+      //将ApplicationMaster返回到关于进度的信息，更新到ReSourceManager所维护的appAttempt中去，
+      //使得这两部分信息保持一致,   this.rmContext.getDispatcher()是AsyncDispatcher，得到的
+      //eventHandler是ApplicationAttemptEventDispatcher
       this.rmContext.getDispatcher().getEventHandler().handle(
           new RMAppAttemptStatusupdateEvent(appAttemptId, request
               .getProgress()));
 
+      //新的资源请求
       List<ResourceRequest> ask = request.getAskList();
+      //NodeManager已经释放的container信息
       List<ContainerId> release = request.getReleaseList();
 
+      //黑名单信息，不希望自己的container分配到这些机器上
       ResourceBlacklistRequest blacklistRequest =
           request.getResourceBlacklistRequest();
+      //添加到黑名单中的资源list
       List<String> blacklistAdditions =
           (blacklistRequest != null) ?
               blacklistRequest.getBlacklistAdditions() : Collections.EMPTY_LIST;
+      //应该从黑名单中移除的资源名称的list
       List<String> blacklistRemovals =
           (blacklistRequest != null) ?
               blacklistRequest.getBlacklistRemovals() : Collections.EMPTY_LIST;
+      //ResourceManager维护的这个application的信息,运行时，这个app是一个RMAppImpl
       RMApp app =
           this.rmContext.getRMApps().get(applicationId);
       
       // set label expression for Resource Requests if resourceName=ANY 
       ApplicationSubmissionContext asc = app.getApplicationSubmissionContext();
       for (ResourceRequest req : ask) {
+        //ResourceRequest.ANY代表这个资源分派请求对机器不挑剔，集群中任何机器都行
         if (null == req.getNodeLabelExpression()
             && ResourceRequest.ANY.equals(req.getResourceName())) {
+          //如果这个资源请求不挑机器，并且没有设置nodeLabel, 那么就将nodeLabel设置为
+          //客户端提交应用时候指定的nodelabel，当然，有可能客户端提交应用的时候没有指定nodeLabel
           req.setNodeLabelExpression(asc.getNodeLabelExpression());
         }
       }
               
       // sanity check
+      //完整性检查，包括规范化NodeLabel , 同时对资源合法性进行校验
       try {
         RMServerUtils.normalizeAndValidateRequests(ask,
             rScheduler.getMaximumResourceCapability(), app.getQueue(),
@@ -506,7 +528,8 @@ public class ApplicationMasterService extends AbstractService implements
         LOG.warn("Invalid resource ask by application " + appAttemptId, e);
         throw e;
       }
-      
+
+      //对黑名单资源进行检查
       try {
         RMServerUtils.validateBlacklistRequest(blacklistRequest);
       }  catch (InvalidResourceBlacklistRequestException e) {
@@ -516,9 +539,14 @@ public class ApplicationMasterService extends AbstractService implements
 
       // In the case of work-preserving AM restart, it's possible for the
       // AM to release containers from the earlier attempt.
+      //在work-preserving 关闭的情况下，不应该发生申请释放的container的applicationAttemptId
+      //与当前AM的attemptId不一致的 情况，如果发生，则抛出异常
       if (!app.getApplicationSubmissionContext()
         .getKeepContainersAcrossApplicationAttempts()) {
         try {
+          //确认释放请求中所有的container都是当前这个application的id
+          //如果真的发生了AM restart并且work-preserving AM restart打开，那么这些container中包含的
+          //getApplicationAttemptId应该与重启以后的ApplicationAttemptId不同，这时候这个
           RMServerUtils.validateContainerReleaseRequest(release, appAttemptId);
         } catch (InvalidContainerReleaseException e) {
           LOG.warn("Invalid container release by application " + appAttemptId, e);
@@ -527,6 +555,7 @@ public class ApplicationMasterService extends AbstractService implements
       }
 
       // Send new requests to appAttempt.
+      //如果我们使用的是fairScheduler,则调用的是FairScheduler.allocate()
       Allocation allocation =
           this.rScheduler.allocate(appAttemptId, ask, release, 
               blacklistAdditions, blacklistRemovals);
@@ -544,6 +573,7 @@ public class ApplicationMasterService extends AbstractService implements
       }
 
       // update the response with the deltas of node status changes
+      //设置response中所有节点的信息
       List<RMNode> updatedNodes = new ArrayList<RMNode>();
       if(app.pullRMNodeUpdates(updatedNodes) > 0) {
         List<NodeReport> updatedNodeReports = new ArrayList<NodeReport>();
@@ -569,12 +599,16 @@ public class ApplicationMasterService extends AbstractService implements
         allocateResponse.setUpdatedNodes(updatedNodeReports);
       }
 
+      //已经为这个application分配的信息
       allocateResponse.setAllocatedContainers(allocation.getContainers());
+      //已经完成的container的状态
       allocateResponse.setCompletedContainersStatuses(appAttempt
           .pullJustFinishedContainers());
+      //responseID自增1
       allocateResponse.setResponseId(lastResponse.getResponseId() + 1);
       allocateResponse.setAvailableResources(allocation.getResourceLimit());
 
+      //集群中可用节点的数目
       allocateResponse.setNumClusterNodes(this.rScheduler.getNumClusterNodes());
 
       // add preemption to the allocateResponse message (if any)

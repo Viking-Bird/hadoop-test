@@ -36,17 +36,20 @@ public class ApplicationMasterLauncher extends AbstractService implements
       ApplicationMasterLauncher.class);
   private final ThreadPoolExecutor launcherPool;
   private LauncherThread launcherHandlingThread;
-  
+
+  //事件队列
   private final BlockingQueue<Runnable> masterEvents
     = new LinkedBlockingQueue<Runnable>();
-  
+  //资源管理器上下文
   protected final RMContext context;
   
   public ApplicationMasterLauncher(RMContext context) {
     super(ApplicationMasterLauncher.class.getName());
     this.context = context;
+    //初始化事件处理线程池
     this.launcherPool = new ThreadPoolExecutor(10, 10, 1, 
         TimeUnit.HOURS, new LinkedBlockingQueue<Runnable>());
+    //新建事件处理线程
     this.launcherHandlingThread = new LauncherThread();
   }
   
@@ -62,10 +65,12 @@ public class ApplicationMasterLauncher extends AbstractService implements
         new AMLauncher(context, application, event, getConfig());
     return launcher;
   }
-  
+
+  // 添加应用启动事件
   private void launch(RMAppAttempt application) {
     Runnable launcher = createRunnableLauncher(application, 
         AMLauncherEventType.LAUNCH);
+    //将启动事件加入事件队列中
     masterEvents.add(launcher);
   }
   
@@ -92,7 +97,9 @@ public class ApplicationMasterLauncher extends AbstractService implements
       while (!this.isInterrupted()) {
         Runnable toLaunch;
         try {
+          //执行方法为从事件队列中逐一取出事件
           toLaunch = masterEvents.take();
+          //放入线程池池中进行执行
           launcherPool.execute(toLaunch);
         } catch (InterruptedException e) {
           LOG.warn(this.getClass().getName() + " interrupted. Returning.");
@@ -111,6 +118,7 @@ public class ApplicationMasterLauncher extends AbstractService implements
   public synchronized void  handle(AMLauncherEvent appEvent) {
     AMLauncherEventType event = appEvent.getType();
     RMAppAttempt application = appEvent.getAppAttempt();
+    //处理来自ApplicationMaster获取到的请求，分为启动事件和清洗事件2种
     switch (event) {
     case LAUNCH:
       launch(application);

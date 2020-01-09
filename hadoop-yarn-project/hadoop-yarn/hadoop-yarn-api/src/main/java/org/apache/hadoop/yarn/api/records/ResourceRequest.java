@@ -81,10 +81,10 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
       Resource capability, int numContainers, boolean relaxLocality,
       String labelExpression) {
     ResourceRequest request = Records.newRecord(ResourceRequest.class);
-    request.setPriority(priority);
+    request.setPriority(priority); // 资源优先级，值越小，优先级越高
     request.setResourceName(hostName);
-    request.setCapability(capability);
-    request.setNumContainers(numContainers);
+    request.setCapability(capability); // 所需的资源量：支持CPU和内存两种资源
+    request.setNumContainers(numContainers); // 需要满足以上条件的资源数目
     request.setRelaxLocality(relaxLocality);
     request.setNodeLabelExpression(labelExpression);
     return request;

@@ -441,15 +441,16 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
     LOG.info("Making reservation: node=" + node.getNodeName() +
         " app_id=" + getApplicationId());
 
-    if (!alreadyReserved) {
+    // 查看FSAppAttempt.assignReservedContainer()，可以看到，对于一个已经进行了reservation的节点，会试图将这个 reservation变成allocation,
+    if (!alreadyReserved) { //如果这不是一个已经reserve过的attempt，即这个attempt从来都没有做过reservation
       getMetrics().reserveResource(getUser(), container.getResource());
       RMContainer rmContainer =
           super.reserve(node, priority, null, container);
-      node.reserveResource(this, priority, rmContainer);
-    } else {
+      node.reserveResource(this, priority, rmContainer); // 为这个节点进行reserve操作
+    } else { // 如果这是已经已经处在预留状态的container，则继续保持预留状态
       RMContainer rmContainer = node.getReservedContainer();
       super.reserve(node, priority, rmContainer, container);
-      node.reserveResource(this, priority, rmContainer);
+      node.reserveResource(this, priority, rmContainer);// 如果已经进行了reserve操作，则这里相当于更新一下节点的reserve操作
     }
   }
 

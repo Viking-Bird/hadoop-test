@@ -51,6 +51,10 @@ import org.apache.hadoop.yarn.util.Records;
  * 
  * @see ContainerManagementProtocol#startContainers(org.apache.hadoop.yarn.api.protocolrecords.StartContainersRequest)
  */
+
+/**
+ * 封装NodeManager运行Container所需的信息
+ */
 @Public
 @Stable
 public abstract class ContainerLaunchContext {
@@ -64,9 +68,9 @@ public abstract class ContainerLaunchContext {
       Map<ApplicationAccessType, String> acls) {
     ContainerLaunchContext container =
         Records.newRecord(ContainerLaunchContext.class);
-    container.setLocalResources(localResources);
-    container.setEnvironment(environment);
-    container.setCommands(commands);
+    container.setLocalResources(localResources); // 启动ApplicationMaster所需的本地资源
+    container.setEnvironment(environment);  // ApplicationMaster运行时所需的环境变量
+    container.setCommands(commands); // ApplicationMaster启动命令
     container.setServiceData(serviceData);
     container.setTokens(tokens);
     container.setApplicationACLs(acls);

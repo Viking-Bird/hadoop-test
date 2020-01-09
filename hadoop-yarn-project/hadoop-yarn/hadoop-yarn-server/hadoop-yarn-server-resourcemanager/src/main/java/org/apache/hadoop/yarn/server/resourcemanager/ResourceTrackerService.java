@@ -78,7 +78,7 @@ public class ResourceTrackerService extends AbstractService implements
 
   private static final Log LOG = LogFactory.getLog(ResourceTrackerService.class);
 
-  private static final RecordFactory recordFactory = 
+  private static final RecordFactory recordFactory =
     RecordFactoryProvider.getRecordFactory(null);
 
   private final RMContext rmContext;
@@ -96,7 +96,7 @@ public class ResourceTrackerService extends AbstractService implements
       .newRecordInstance(NodeHeartbeatResponse.class);
   private static final NodeHeartbeatResponse shutDown = recordFactory
   .newRecordInstance(NodeHeartbeatResponse.class);
-  
+
   private int minAllocMb;
   private int minAllocVcores;
 
@@ -129,6 +129,8 @@ public class ResourceTrackerService extends AbstractService implements
         YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_PORT);
 
     RackResolver.init(conf);
+
+    // 设置NodeManager心跳间隔
     nextHeartBeatInterval =
         conf.getLong(YarnConfiguration.RM_NM_HEARTBEAT_INTERVAL_MS,
             YarnConfiguration.DEFAULT_RM_NM_HEARTBEAT_INTERVAL_MS);
@@ -138,9 +140,11 @@ public class ResourceTrackerService extends AbstractService implements
           + " should be larger than 0.");
     }
 
+    // 单个可申请的最小/最大内存资源量
     minAllocMb = conf.getInt(
     	YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
     	YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB);
+    // 单个可申请的最小/最大虚拟CPU个数
     minAllocVcores = conf.getInt(
     	YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES,
     	YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
@@ -152,6 +156,10 @@ public class ResourceTrackerService extends AbstractService implements
     super.serviceInit(conf);
   }
 
+  /**
+   * 启动RPC Server
+   * @throws Exception
+   */
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
@@ -162,12 +170,12 @@ public class ResourceTrackerService extends AbstractService implements
     this.server =
       rpc.getServer(ResourceTracker.class, this, resourceTrackerAddress,
           conf, null,
-          conf.getInt(YarnConfiguration.RM_RESOURCE_TRACKER_CLIENT_THREAD_COUNT, 
+          conf.getInt(YarnConfiguration.RM_RESOURCE_TRACKER_CLIENT_THREAD_COUNT,
               YarnConfiguration.DEFAULT_RM_RESOURCE_TRACKER_CLIENT_THREAD_COUNT));
-    
+
     // Enable service authorization?
     if (conf.getBoolean(
-        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, 
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       InputStream inputStream =
           this.rmContext.getConfigurationProvider()
@@ -178,7 +186,7 @@ public class ResourceTrackerService extends AbstractService implements
       }
       refreshServiceAcls(conf, RMPolicyProvider.getInstance());
     }
- 
+
     this.server.start();
     conf.updateConnectAddr(YarnConfiguration.RM_BIND_HOST,
 			   YarnConfiguration.RM_RESOURCE_TRACKER_ADDRESS,
@@ -238,6 +246,13 @@ public class ResourceTrackerService extends AbstractService implements
     }
   }
 
+  /**
+   * 处理NodeManager注册请求
+   * @param request
+   * @return
+   * @throws YarnException
+   * @throws IOException
+   */
   @SuppressWarnings("unchecked")
   @Override
   public RegisterNodeManagerResponse registerNodeManager(
@@ -273,6 +288,7 @@ public class ResourceTrackerService extends AbstractService implements
     }
 
     // Check if this node is a 'valid' node
+    //如果此节点是在exclude名单中,注册请求将会被拒绝,调用的是节点列表管理器的isValidNode方法
     if (!this.nodesListManager.isValidNode(host)) {
       String message =
           "Disallowed NodeManager from  " + host
@@ -284,6 +300,7 @@ public class ResourceTrackerService extends AbstractService implements
     }
 
     // Check if this node has minimum allocations
+    //判断节点所剩资源是否满足最小内存和核数的限制,如果没有同样拒绝注册
     if (capability.getMemory() < minAllocMb
         || capability.getVirtualCores() < minAllocVcores) {
       String message =
@@ -299,11 +316,12 @@ public class ResourceTrackerService extends AbstractService implements
     response.setContainerTokenMasterKey(containerTokenSecretManager
         .getCurrentKey());
     response.setNMTokenMasterKey(nmTokenSecretManager
-        .getCurrentKey());    
+        .getCurrentKey());
 
     RMNode rmNode = new RMNodeImpl(nodeId, rmContext, host, cmPort, httpPort,
         resolve(host), capability, nodeManagerVersion);
 
+    // 判断NodeManager是否注册过
     RMNode oldNode = this.rmContext.getRMNodes().putIfAbsent(nodeId, rmNode);
     if (oldNode == null) {
       this.rmContext.getDispatcher().getEventHandler().handle(
@@ -324,8 +342,9 @@ public class ResourceTrackerService extends AbstractService implements
     // On every node manager register we will be clearing NMToken keys if
     // present for any running application.
     this.nmTokenSecretManager.removeNodeKey(nodeId);
+    //同时将节点注册到节点存活监控线程中
     this.nmLivelinessMonitor.register(nodeId);
-    
+
     // Handle received container status, this should be processed after new
     // RMNode inserted
     if (!rmContext.isWorkPreservingRecoveryEnabled()) {
@@ -358,11 +377,11 @@ public class ResourceTrackerService extends AbstractService implements
     /**
      * Here is the node heartbeat sequence...
      * 1. Check if it's a registered node
-     * 2. Check if it's a valid (i.e. not excluded) node 
-     * 3. Check if it's a 'fresh' heartbeat i.e. not duplicate heartbeat 
+     * 2. Check if it's a valid (i.e. not excluded) node
+     * 3. Check if it's a 'fresh' heartbeat i.e. not duplicate heartbeat
      * 4. Send healthStatus to RMNode
      */
-
+    // 从心跳中获取远程节点状态信息
     NodeId nodeId = remoteNodeStatus.getNodeId();
 
     // 1. Check if it's a registered node
@@ -376,6 +395,7 @@ public class ResourceTrackerService extends AbstractService implements
     }
 
     // Send ping
+    //更新心跳响应最新时间
     this.nmLivelinessMonitor.receivedPing(nodeId);
 
     // 2. Check if it's a valid (i.e. not excluded) node
@@ -389,8 +409,9 @@ public class ResourceTrackerService extends AbstractService implements
           new RMNodeEvent(nodeId, RMNodeEventType.DECOMMISSION));
       return shutDown;
     }
-    
+
     // 3. Check if it's a 'fresh' heartbeat i.e. not duplicate heartbeat
+    //每次心跳检测都会检查节点是否被拉入exclude名单
     NodeHeartbeatResponse lastNodeHeartbeatResponse = rmNode.getLastNodeHeartBeatResponse();
     if (remoteNodeStatus.getResponseId() + 1 == lastNodeHeartbeatResponse
         .getResponseId()) {
@@ -412,6 +433,7 @@ public class ResourceTrackerService extends AbstractService implements
     }
 
     // Heartbeat response
+    //设置心跳回复
     NodeHeartbeatResponse nodeHeartBeatResponse = YarnServerBuilderUtils
         .newNodeHeartbeatResponse(lastNodeHeartbeatResponse.
             getResponseId() + 1, NodeAction.NORMAL, null, null, null, null,
@@ -429,7 +451,7 @@ public class ResourceTrackerService extends AbstractService implements
     // 4. Send status to RMNode, saving the latest response.
     this.rmContext.getDispatcher().getEventHandler().handle(
         new RMNodeStatusEvent(nodeId, remoteNodeStatus.getNodeHealthStatus(),
-            remoteNodeStatus.getContainersStatuses(), 
+            remoteNodeStatus.getContainersStatuses(),
             remoteNodeStatus.getKeepAliveApplications(), nodeHeartBeatResponse));
 
     return nodeHeartBeatResponse;
@@ -455,7 +477,7 @@ public class ResourceTrackerService extends AbstractService implements
 
     nextMasterKeyForNode = this.nmTokenSecretManager.getNextKey();
     if (nextMasterKeyForNode != null
-        && (request.getLastKnownNMTokenMasterKey().getKeyId() 
+        && (request.getLastKnownNMTokenMasterKey().getKeyId()
             != nextMasterKeyForNode.getKeyId())) {
       nodeHeartBeatResponse.setNMTokenMasterKey(nextMasterKeyForNode);
     }
@@ -470,7 +492,7 @@ public class ResourceTrackerService extends AbstractService implements
     return RackResolver.resolve(hostName);
   }
 
-  void refreshServiceAcls(Configuration configuration, 
+  void refreshServiceAcls(Configuration configuration,
       PolicyProvider policyProvider) {
     this.server.refreshServiceAclWithLoadedConfiguration(configuration,
         policyProvider);

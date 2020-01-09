@@ -63,6 +63,10 @@ import org.apache.hadoop.yarn.util.Records;
  * @see ContainerLaunchContext
  * @see ApplicationClientProtocol#submitApplication(org.apache.hadoop.yarn.api.protocolrecords.SubmitApplicationRequest)
  */
+
+/**
+ * 封装客户端启动ApplicationMaster的信息
+ */
 @Public
 @Stable
 public abstract class ApplicationSubmissionContext {

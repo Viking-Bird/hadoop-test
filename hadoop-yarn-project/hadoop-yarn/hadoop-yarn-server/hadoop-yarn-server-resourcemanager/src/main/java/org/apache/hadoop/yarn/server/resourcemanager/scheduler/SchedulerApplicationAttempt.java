@@ -68,7 +68,7 @@ import com.google.common.collect.Multiset;
 @Private
 @Unstable
 public class SchedulerApplicationAttempt {
-  
+
   private static final Log LOG = LogFactory
     .getLog(SchedulerApplicationAttempt.class);
 
@@ -78,14 +78,14 @@ public class SchedulerApplicationAttempt {
   private long lastVcoreSeconds = 0;
 
   protected final AppSchedulingInfo appSchedulingInfo;
-  
+
   protected Map<ContainerId, RMContainer> liveContainers =
       new HashMap<ContainerId, RMContainer>();
-  protected final Map<Priority, Map<NodeId, RMContainer>> reservedContainers = 
+  protected final Map<Priority, Map<NodeId, RMContainer>> reservedContainers =
       new HashMap<Priority, Map<NodeId, RMContainer>>();
 
   private final Multiset<Priority> reReservations = HashMultiset.create();
-  
+
   protected final Resource currentReservation = Resource.newInstance(0, 0);
   private Resource resourceLimit = Resource.newInstance(0, 0);
   protected Resource currentConsumption = Resource.newInstance(0, 0);
@@ -94,7 +94,7 @@ public class SchedulerApplicationAttempt {
   private boolean amRunning = false;
   private LogAggregationContext logAggregationContext;
 
-  protected List<RMContainer> newlyAllocatedContainers = 
+  protected List<RMContainer> newlyAllocatedContainers =
       new ArrayList<RMContainer>();
 
   // This pendingRelease is used in work-preserving recovery scenario to keep
@@ -112,23 +112,23 @@ public class SchedulerApplicationAttempt {
    * is reset to 0.
    */
   Multiset<Priority> schedulingOpportunities = HashMultiset.create();
-  
+
   // Time of the last container scheduled at the current allowed level
   protected Map<Priority, Long> lastScheduledContainer =
       new HashMap<Priority, Long>();
 
   protected Queue queue;
   protected boolean isStopped = false;
-  
+
   protected final RMContext rmContext;
-  
-  public SchedulerApplicationAttempt(ApplicationAttemptId applicationAttemptId, 
+
+  public SchedulerApplicationAttempt(ApplicationAttemptId applicationAttemptId,
       String user, Queue queue, ActiveUsersManager activeUsersManager,
       RMContext rmContext) {
     Preconditions.checkNotNull("RMContext should not be null", rmContext);
     this.rmContext = rmContext;
-    this.appSchedulingInfo = 
-        new AppSchedulingInfo(applicationAttemptId, user, queue,  
+    this.appSchedulingInfo =
+        new AppSchedulingInfo(applicationAttemptId, user, queue,
             activeUsersManager, rmContext.getEpoch());
     this.queue = queue;
     this.pendingRelease = new HashSet<ContainerId>();
@@ -145,7 +145,7 @@ public class SchedulerApplicationAttempt {
       }
     }
   }
-  
+
   /**
    * Get the live containers of the application.
    * @return live containers of the application
@@ -153,7 +153,7 @@ public class SchedulerApplicationAttempt {
   public synchronized Collection<RMContainer> getLiveContainers() {
     return new ArrayList<RMContainer>(liveContainers.values());
   }
-  
+
   /**
    * Is this application pending?
    * @return true if it is else false.
@@ -161,7 +161,7 @@ public class SchedulerApplicationAttempt {
   public boolean isPending() {
     return appSchedulingInfo.isPending();
   }
-  
+
   /**
    * Get {@link ApplicationAttemptId} of the application master.
    * @return <code>ApplicationAttemptId</code> of the application master
@@ -169,11 +169,11 @@ public class SchedulerApplicationAttempt {
   public ApplicationAttemptId getApplicationAttemptId() {
     return appSchedulingInfo.getApplicationAttemptId();
   }
-  
+
   public ApplicationId getApplicationId() {
     return appSchedulingInfo.getApplicationId();
   }
-  
+
   public String getUser() {
     return appSchedulingInfo.getUser();
   }
@@ -193,7 +193,7 @@ public class SchedulerApplicationAttempt {
   public Collection<Priority> getPriorities() {
     return appSchedulingInfo.getPriorities();
   }
-  
+
   public synchronized ResourceRequest getResourceRequest(Priority priority, String resourceName) {
     return this.appSchedulingInfo.getResourceRequest(priority, resourceName);
   }
@@ -209,7 +209,7 @@ public class SchedulerApplicationAttempt {
   public String getQueueName() {
     return appSchedulingInfo.getQueueName();
   }
-  
+
   public Resource getAMResource() {
     return amResource;
   }
@@ -256,25 +256,25 @@ public class SchedulerApplicationAttempt {
   public synchronized Resource getCurrentReservation() {
     return currentReservation;
   }
-  
+
   public Queue getQueue() {
     return queue;
   }
-  
+
   public synchronized void updateResourceRequests(
       List<ResourceRequest> requests) {
     if (!isStopped) {
       appSchedulingInfo.updateResourceRequests(requests, false);
     }
   }
-  
+
   public synchronized void recoverResourceRequests(
       List<ResourceRequest> requests) {
     if (!isStopped) {
       appSchedulingInfo.updateResourceRequests(requests, true);
     }
   }
-  
+
   public synchronized void stop(RMAppAttemptState rmAppAttemptFinalState) {
     // Cleanup all scheduling information
     isStopped = true;
@@ -291,33 +291,36 @@ public class SchedulerApplicationAttempt {
    */
   public synchronized List<RMContainer> getReservedContainers() {
     List<RMContainer> reservedContainers = new ArrayList<RMContainer>();
-    for (Map.Entry<Priority, Map<NodeId, RMContainer>> e : 
+    for (Map.Entry<Priority, Map<NodeId, RMContainer>> e :
       this.reservedContainers.entrySet()) {
       reservedContainers.addAll(e.getValue().values());
     }
     return reservedContainers;
   }
-  
+
   public synchronized RMContainer reserve(SchedulerNode node, Priority priority,
       RMContainer rmContainer, Container container) {
     // Create RMContainer if necessary
     if (rmContainer == null) {
-      rmContainer = 
-          new RMContainerImpl(container, getApplicationAttemptId(), 
+      rmContainer =
+          new RMContainerImpl(container, getApplicationAttemptId(),
               node.getNodeID(), appSchedulingInfo.getUser(), rmContext);
-        
+      //将这个预留的container的信息增加到currentReservation中，currentReservation中记录了当前
+      //这个application所有处于预留状态的资源总量
       Resources.addTo(currentReservation, container.getResource());
-      
+
       // Reset the re-reservation count
       resetReReservations(priority);
     } else {
       // Note down the re-reservation
       addReReservation(priority);
     }
-    rmContainer.handle(new RMContainerReservedEvent(container.getId(), 
+    //产生一个RMContainerReservedEvent,通知这个处于reserve状态的container
+    rmContainer.handle(new RMContainerReservedEvent(container.getId(),
         container.getResource(), node.getNodeID(), priority));
-    
-    Map<NodeId, RMContainer> reservedContainers = 
+
+    //更新reservedContainers，reservedContainers保存了每一个Priority的预留信息，即预留节点和预留的container之间的对应关系
+    Map<NodeId, RMContainer> reservedContainers =
         this.reservedContainers.get(priority);
     if (reservedContainers == null) {
       reservedContainers = new HashMap<NodeId, RMContainer>();
@@ -335,7 +338,7 @@ public class SchedulerApplicationAttempt {
 
     return rmContainer;
   }
-  
+
   /**
    * Has the application reserved the given <code>node</code> at the
    * given <code>priority</code>?
@@ -344,16 +347,16 @@ public class SchedulerApplicationAttempt {
    * @return true is reserved, false if not
    */
   public synchronized boolean isReserved(SchedulerNode node, Priority priority) {
-    Map<NodeId, RMContainer> reservedContainers = 
+    Map<NodeId, RMContainer> reservedContainers =
         this.reservedContainers.get(priority);
     if (reservedContainers != null) {
       return reservedContainers.containsKey(node.getNodeID());
     }
     return false;
   }
-  
+
   public synchronized void setHeadroom(Resource globalLimit) {
-    this.resourceLimit = globalLimit; 
+    this.resourceLimit = globalLimit;
   }
 
   /**
@@ -365,16 +368,16 @@ public class SchedulerApplicationAttempt {
     if (resourceLimit.getMemory() < 0) {
       resourceLimit.setMemory(0);
     }
-    
+
     return resourceLimit;
   }
-  
+
   public synchronized int getNumReservedContainers(Priority priority) {
-    Map<NodeId, RMContainer> reservedContainers = 
+    Map<NodeId, RMContainer> reservedContainers =
         this.reservedContainers.get(priority);
     return (reservedContainers == null) ? 0 : reservedContainers.size();
   }
-  
+
   @SuppressWarnings("unchecked")
   public synchronized void containerLaunchedOnNode(ContainerId containerId,
       NodeId nodeId) {
@@ -390,14 +393,14 @@ public class SchedulerApplicationAttempt {
     rmContainer.handle(new RMContainerEvent(containerId,
         RMContainerEventType.LAUNCHED));
   }
-  
+
   public synchronized void showRequests() {
     if (LOG.isDebugEnabled()) {
       for (Priority priority : getPriorities()) {
         Map<String, ResourceRequest> requests = getResourceRequests(priority);
         if (requests != null) {
-          LOG.debug("showRequests:" + " application=" + getApplicationId() + 
-              " headRoom=" + getHeadroom() + 
+          LOG.debug("showRequests:" + " application=" + getApplicationId() +
+              " headRoom=" + getHeadroom() +
               " currentConsumption=" + currentConsumption.getMemory());
           for (ResourceRequest request : requests.values()) {
             LOG.debug("showRequests:" + " application=" + getApplicationId()
@@ -407,7 +410,7 @@ public class SchedulerApplicationAttempt {
       }
     }
   }
-  
+
   public Resource getCurrentConsumption() {
     return currentConsumption;
   }
@@ -476,7 +479,7 @@ public class SchedulerApplicationAttempt {
           blacklistAdditions, blacklistRemovals);
     }
   }
-  
+
   public boolean isBlacklisted(String resourceName) {
     return this.appSchedulingInfo.isBlacklisted(resourceName);
   }
@@ -485,7 +488,7 @@ public class SchedulerApplicationAttempt {
     schedulingOpportunities.setCount(priority,
         schedulingOpportunities.count(priority) + 1);
   }
-  
+
   public synchronized void subtractSchedulingOpportunity(Priority priority) {
     int count = schedulingOpportunities.count(priority) - 1;
     this.schedulingOpportunities.setCount(priority, Math.max(count,  0));
@@ -499,7 +502,7 @@ public class SchedulerApplicationAttempt {
   public synchronized int getSchedulingOpportunities(Priority priority) {
     return schedulingOpportunities.count(priority);
   }
-  
+
   /**
    * Should be called when an application has successfully scheduled a container,
    * or when the scheduling locality threshold is relaxed.
@@ -517,23 +520,33 @@ public class SchedulerApplicationAttempt {
     schedulingOpportunities.setCount(priority, 0);
   }
 
+  /**
+   * 返回与任务关联的所有的container每秒消耗的CPU和内存资源数量
+   * @return
+   */
   synchronized AggregateAppResourceUsage getRunningAggregateAppResourceUsage() {
     long currentTimeMillis = System.currentTimeMillis();
     // Don't walk the whole container list if the resources were computed
     // recently.
+    // 判断是否达到更新条件：当前时间 - 最后更新时间 > 最大更新间隔（3秒）
     if ((currentTimeMillis - lastMemoryAggregateAllocationUpdateTime)
         > MEM_AGGREGATE_ALLOCATION_CACHE_MSECS) {
       long memorySeconds = 0;
       long vcoreSeconds = 0;
+      // 迭代所有的container，计算每个container每秒所消耗的资源（内存、CPU）
       for (RMContainer rmContainer : this.liveContainers.values()) {
+        // 获取container的运行时间
         long usedMillis = currentTimeMillis - rmContainer.getCreationTime();
+        // 计算container每秒所消耗的资源（内存、CPU）
         Resource resource = rmContainer.getContainer().getResource();
-        memorySeconds += resource.getMemory() * usedMillis /  
+        // 汇总内存和CPU使用量
+        memorySeconds += resource.getMemory() * usedMillis /
             DateUtils.MILLIS_PER_SECOND;
-        vcoreSeconds += resource.getVirtualCores() * usedMillis  
+        vcoreSeconds += resource.getVirtualCores() * usedMillis
             / DateUtils.MILLIS_PER_SECOND;
       }
 
+      // 记录最后更新任务资源使用情况的时间、任务最后每秒使用的内存和CPU数量
       lastMemoryAggregateAllocationUpdateTime = currentTimeMillis;
       lastMemorySeconds = memorySeconds;
       lastVcoreSeconds = vcoreSeconds;
@@ -541,8 +554,13 @@ public class SchedulerApplicationAttempt {
     return new AggregateAppResourceUsage(lastMemorySeconds, lastVcoreSeconds);
   }
 
+  /**
+   * 返回任务使用的资源情况
+   * @return
+   */
   public synchronized ApplicationResourceUsageReport getResourceUsageReport() {
     AggregateAppResourceUsage resUsage = getRunningAggregateAppResourceUsage();
+    // 返回任务所使用的资源情况：所使用的container数量、预留的container数量、当前消耗的资源、当前预留的资源、所需的总资源（当前消耗的资源+当前预留的资源）、每秒的内存和CPU使用量
     return ApplicationResourceUsageReport.newInstance(liveContainers.size(),
                reservedContainers.size(), Resources.clone(currentConsumption),
                Resources.clone(currentReservation),
@@ -575,7 +593,7 @@ public class SchedulerApplicationAttempt {
     this.appSchedulingInfo
       .transferStateFromPreviousAppSchedulingInfo(appAttempt.appSchedulingInfo);
   }
-  
+
   public synchronized void move(Queue newQueue) {
     QueueMetrics oldMetrics = queue.getMetrics();
     QueueMetrics newMetrics = newQueue.getMetrics();

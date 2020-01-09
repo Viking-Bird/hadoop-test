@@ -75,7 +75,7 @@ public abstract class AllocateRequest {
     AllocateRequest allocateRequest = Records.newRecord(AllocateRequest.class);
     allocateRequest.setResponseId(responseID);
     allocateRequest.setProgress(appProgress);
-    allocateRequest.setAskList(resourceAsk);
+    allocateRequest.setAskList(resourceAsk); // 请求的资源列表
     allocateRequest.setReleaseList(containersToBeReleased);
     allocateRequest.setResourceBlacklistRequest(resourceBlacklistRequest);
     allocateRequest.setIncreaseRequests(increaseRequests);

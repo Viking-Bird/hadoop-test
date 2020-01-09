@@ -69,8 +69,8 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
 
   private int maxCompletedAppsInMemory;
   private int maxCompletedAppsInStateStore;
-  protected int completedAppsInStateStore = 0;
-  private LinkedList<ApplicationId> completedApps = new LinkedList<ApplicationId>();
+  protected int completedAppsInStateStore = 0; //记录已完成任务的信息，任务完成自动加1
+  private LinkedList<ApplicationId> completedApps = new LinkedList<ApplicationId>();// 记录已完成任务的任务ID
 
   private final RMContext rmContext;
   private final ApplicationMasterService masterService;
@@ -190,6 +190,10 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
     return this.completedApps.size(); 
   }
 
+  /**
+   * 保存已完成任务信息
+   * @param applicationId
+   */
   protected synchronized void finishApplication(ApplicationId applicationId) {
     if (applicationId == null) {
       LOG.error("RMAppManager received completed appId of null, skipping");
@@ -237,6 +241,8 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
 
   /*
    * check to see if hit the limit for max # completed apps kept
+   *
+   * 检查存储在内存和ZK中已完成应用的数量是否超过最大限制，超过限制就执行移除已完成任务信息操作
    */
   protected synchronized void checkAppNumCompletedLimit() {
     // check apps kept in state store.

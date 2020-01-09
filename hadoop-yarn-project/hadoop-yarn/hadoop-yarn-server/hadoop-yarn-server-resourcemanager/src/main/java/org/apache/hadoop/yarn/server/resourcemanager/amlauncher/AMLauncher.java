@@ -66,6 +66,7 @@ import com.google.common.annotations.VisibleForTesting;
 
 /**
  * The launch of the AM itself.
+ * Application事件执行器
  */
 public class AMLauncher implements Runnable {
 
@@ -247,10 +248,12 @@ public class AMLauncher implements Runnable {
   
   @SuppressWarnings("unchecked")
   public void run() {
+    // 按照事件类型区分操作
     switch (eventType) {
     case LAUNCH:
       try {
         LOG.info("Launching master" + application.getAppAttemptId());
+        // 调用启动方法
         launch();
         handler.handle(new RMAppAttemptEvent(application.getAppAttemptId(),
             RMAppAttemptEventType.LAUNCHED));
@@ -265,6 +268,7 @@ public class AMLauncher implements Runnable {
     case CLEANUP:
       try {
         LOG.info("Cleaning master " + application.getAppAttemptId());
+        //调用作业清洗方法
         cleanup();
       } catch(IOException ie) {
         LOG.info("Error cleaning master ", ie);

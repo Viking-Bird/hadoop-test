@@ -62,8 +62,8 @@ public abstract class RegisterApplicationMasterResponse {
       List<NMToken> nmTokensFromPreviousAttempts) {
     RegisterApplicationMasterResponse response =
         Records.newRecord(RegisterApplicationMasterResponse.class);
-    response.setMaximumResourceCapability(maxCapability);
-    response.setApplicationACLs(acls);
+    response.setMaximumResourceCapability(maxCapability); // 最大可申请的最大container占用的资源量
+    response.setApplicationACLs(acls); // 应用程序访问控制列表
     response.setClientToAMTokenMasterKey(key);
     response.setContainersFromPreviousAttempts(containersFromPreviousAttempt);
     response.setNMTokensFromPreviousAttempts(nmTokensFromPreviousAttempts);

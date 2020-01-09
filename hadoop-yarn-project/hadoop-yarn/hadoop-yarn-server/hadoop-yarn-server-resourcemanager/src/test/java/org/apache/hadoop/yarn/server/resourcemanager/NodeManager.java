@@ -60,14 +60,20 @@ import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
+/**
+ * ResourceManager下资源管理器类
+ */
 @Private
 public class NodeManager implements ContainerManagementProtocol {
   private static final Log LOG = LogFactory.getLog(NodeManager.class);
   private static final RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
   
   final private String containerManagerAddress;
+  //节点通信地址
   final private String nodeHttpAddress;
+  //所在机架名称
   final private String rackName;
+  //节点ID
   final private NodeId nodeId;
   final private Resource capability;
   final private ResourceManager resourceManager;
@@ -77,7 +83,7 @@ public class NodeManager implements ContainerManagementProtocol {
   final ResourceTrackerService resourceTrackerService;
   final Map<ApplicationId, List<Container>> containers = 
     new HashMap<ApplicationId, List<Container>>();
-  
+  // 保存Container与Container状态
   final Map<Container, ContainerStatus> containerStatusMap =
       new HashMap<Container, ContainerStatus>();
   
@@ -92,12 +98,15 @@ public class NodeManager implements ContainerManagementProtocol {
     this.capability = capability;
     Resources.addTo(available, capability);
     this.nodeId = NodeId.newInstance(hostName, containerManagerPort);
+    //新建nodemanager注册请求
     RegisterNodeManagerRequest request = recordFactory
         .newRecordInstance(RegisterNodeManagerRequest.class);
+    //往请求内写入状态信息
     request.setHttpPort(httpPort);
     request.setResource(capability);
     request.setNodeId(this.nodeId);
     request.setNMVersion(YarnVersionInfo.getVersion());
+    //调用resourceTrackerService服务对象进行节点注册操作
     resourceTrackerService.registerNodeManager(request);
     this.resourceManager = resourceManager;
     resourceManager.getResourceScheduler().getNodeReport(this.nodeId);

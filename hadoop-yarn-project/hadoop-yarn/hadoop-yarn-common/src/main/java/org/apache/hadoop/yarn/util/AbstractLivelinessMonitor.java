@@ -41,14 +41,18 @@ public abstract class AbstractLivelinessMonitor<O> extends AbstractService {
 
   //thread which runs periodically to see the last time since a heartbeat is
   //received.
+  //检查线程
   private Thread checkerThread;
   private volatile boolean stopped;
+  //默认超时时间5分钟
   public static final int DEFAULT_EXPIRE = 5*60*1000;//5 mins
+  //超时时间
   private int expireInterval = DEFAULT_EXPIRE;
+  //监控间隔检测时间，为超时时间的1/3
   private int monitorInterval = expireInterval/3;
 
   private final Clock clock;
-
+  //保存了心跳检验的结果记录
   private Map<O, Long> running = new HashMap<O, Long>();
 
   public AbstractLivelinessMonitor(String name, Clock clock) {
@@ -85,6 +89,7 @@ public abstract class AbstractLivelinessMonitor<O> extends AbstractService {
     this.monitorInterval = monitorInterval;
   }
 
+  //更新心跳监控检测最新时间
   public synchronized void receivedPing(O ob) {
     //only put for the registered objects
     if (running.containsKey(ob)) {
@@ -92,10 +97,12 @@ public abstract class AbstractLivelinessMonitor<O> extends AbstractService {
     }
   }
 
+  //新的节点注册心跳监控
   public synchronized void register(O ob) {
     running.put(ob, clock.getTime());
   }
 
+  //节点移除心跳监控
   public synchronized void unregister(O ob) {
     running.remove(ob);
   }

@@ -58,6 +58,7 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
 
   // Indicates all the remaining dispatcher's events on stop have been drained
   // and processed.
+  // 标识事件队列是否已经清空
   private volatile boolean drained = true;
   private Object waitForDrained = new Object();
 
@@ -89,9 +90,11 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
           // blockNewEvents is only set when dispatcher is draining to stop,
           // adding this check is to avoid the overhead of acquiring the lock
           // and calling notify every time in the normal run of the loop.
+          // 如果blockNewEvents=true，代表该调度器目前正在进行关闭操作，因此，事件处理线程有必要在发现事件队列已经清空的情况下
           if (blockNewEvents) {
             synchronized (waitForDrained) {
               if (drained) {
+                // 通过waitForDrained锁及时通知到服务关闭线程(waitForDrained.notify())，服务关闭线程收到该通知就能立刻从waitForDrained.wait()中直接唤醒，从而及时完成关闭操作，而不再进行不必要的wait操作
                 waitForDrained.notify();
               }
             }
@@ -137,12 +140,13 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
   @Override
   protected void serviceStop() throws Exception {
     if (drainEventsOnStop) {
-      blockNewEvents = true;
+      blockNewEvents = true;  //首先阻止新任务的分派，试图优雅停掉当前线程的工作
       LOG.info("AsyncDispatcher is draining to stop, igonring any new events.");
       long endTime = System.currentTimeMillis() + getConfig()
           .getLong(YarnConfiguration.DISPATCHER_DRAIN_EVENTS_TIMEOUT,
               YarnConfiguration.DEFAULT_DISPATCHER_DRAIN_EVENTS_TIMEOUT);
 
+      // 服务关闭的时候会每1s检查我们的eventQueue中的所有事件是否处理完毕，如果没有处理完毕，则继续等待。
       synchronized (waitForDrained) {
         while (!drained && eventHandlingThread != null
             && eventHandlingThread.isAlive()
@@ -154,9 +158,9 @@ public class AsyncDispatcher extends AbstractService implements Dispatcher {
     }
     stopped = true;
     if (eventHandlingThread != null) {
-      eventHandlingThread.interrupt();
+      eventHandlingThread.interrupt(); //防止线程正在处理一个耗时任务导致线程依然没有退出
       try {
-        eventHandlingThread.join();
+        eventHandlingThread.join(); //等待eventHandlingThread执行完毕
       } catch (InterruptedException ie) {
         LOG.warn("Interrupted Exception while stopping", ie);
       }

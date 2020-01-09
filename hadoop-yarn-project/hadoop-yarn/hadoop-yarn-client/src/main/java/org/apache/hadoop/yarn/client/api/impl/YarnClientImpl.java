@@ -211,6 +211,7 @@ public class YarnClientImpl extends YarnClient {
       throws YarnException, IOException {
     ApplicationSubmissionContext context = Records.newRecord
         (ApplicationSubmissionContext.class);
+    // 从ResourceManager中获取唯一的applicationID
     GetNewApplicationResponse newApp = getNewApplication();
     ApplicationId appId = newApp.getApplicationId();
     context.setApplicationId(appId);
