@@ -169,9 +169,9 @@ public class FSParentQueue extends FSQueue {
     }
 
     Collections.sort(childQueues, policy.getComparator());
-    for (FSQueue child : childQueues) {
-      assigned = child.assignContainer(node);
-      if (!Resources.equals(assigned, Resources.none())) {
+    for (FSQueue child : childQueues) { //从这个for循环可以看出来这是广度优先遍历
+      assigned = child.assignContainer(node); //childQueus有可能是FSParentQueue或者FSLeafQueue
+      if (!Resources.equals(assigned, Resources.none())) { //如果成功分配到了资源，那么，没有必要再去兄弟节点上进行资源分配了
         break;
       }
     }

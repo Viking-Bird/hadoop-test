@@ -121,7 +121,8 @@ public class FairScheduler extends
   private boolean usePortForNodeName;
 
   private static final Log LOG = LogFactory.getLog(FairScheduler.class);
-  
+
+  // 初始化内存资源比较器
   private static final ResourceCalculator RESOURCE_CALCULATOR =
       new DefaultResourceCalculator();
   
@@ -981,7 +982,9 @@ public class FairScheduler extends
     //进行调度以前，先对节点根据剩余资源的多少进行排序，从而让资源更充裕的节点先得到调度
     //这样我们更容易让所有节点的资源能够被均匀分配，而不会因为某些节点总是先被调度所以总是比
     //后调度的节点的资源使用率更高
+    //使用的是NodeAvailableResourceComparator比较器，实际上比较资源的时候只考虑了内存，没有考虑vCores等其它资源
     synchronized (this) {
+      // 按节点剩余内存大小降序排序
       Collections.sort(nodeIdList, nodeAvailableResourceComparator);
     }
 
@@ -991,6 +994,7 @@ public class FairScheduler extends
       //FSSchedulerNode是FairScheduler视角下的一个节点
       FSSchedulerNode node = getFSSchedulerNode(nodeId);
       try {
+        // 判断节点所剩内存和CPU资源是否满足最小资源要求，如果是，则尝试在这个节点上进行资源分配
         if (node != null && Resources.fitsIn(minimumAllocation,
             node.getAvailableResource())) {
           attemptScheduling(node);
@@ -1033,13 +1037,15 @@ public class FairScheduler extends
     // 2. Schedule if there are no reservations
 
     FSAppAttempt reservedAppSchedulable = node.getReservedAppSchedulable();
-    if (reservedAppSchedulable != null) {
+    if (reservedAppSchedulable != null) { //如果这个节点上已经有reservation
       Priority reservedPriority = node.getReservedContainer().getReservedPriority();
+      //如果这个节点被这个应用预定，这里就去判断这个应用是不是有能够分配到这个node上到请求，如果有这样到请求，并且，没有超过队列到剩余资源，那么，就可以把这个预定的资源尝试进行分配（有可能分配失败）
       if (!reservedAppSchedulable.hasContainerForNode(reservedPriority, node)) {
         // Don't hold the reservation if app can no longer use it
         LOG.info("Releasing reservation that cannot be satisfied for application "
             + reservedAppSchedulable.getApplicationAttemptId()
             + " on node " + node);
+        //如果这个被预留的container已经不符合运行条件，就没有必要保持预留了，直接取消预留，让出资源
         reservedAppSchedulable.unreserve(reservedPriority, node);
         reservedAppSchedulable = null;
       } else {
@@ -1049,18 +1055,18 @@ public class FairScheduler extends
               + reservedAppSchedulable.getApplicationAttemptId()
               + " on node: " + node);
         }
-        
+        //对这个已经进行了reservation对节点进行节点分配，当然，有可能资源还是不足，因此还将处于预定状态
         node.getReservedAppSchedulable().assignReservedContainer(node);
       }
     }
-    if (reservedAppSchedulable == null) {
+    if (reservedAppSchedulable == null) { //这个节点还没有进行reservation，则尝试进行assignment
       // No reservation, schedule at queue which is farthest below fair share
       int assignedContainers = 0;
-      while (node.getReservedContainer() == null) {
+      while (node.getReservedContainer() == null) { //如果这个节点没有进行reservation，那么，就尝试
         boolean assignedContainer = false;
         if (!queueMgr.getRootQueue().assignContainer(node).equals(
-            Resources.none())) {
-          assignedContainers++;
+            Resources.none())) { //尝试进行container的分配，并判断是否完全没有分配到并且也没有reserve成功
+          assignedContainers++; //如果分配到了资源，或者预留到了资源，总之不是none
           assignedContainer = true;
         }
         if (!assignedContainer) { break; }
