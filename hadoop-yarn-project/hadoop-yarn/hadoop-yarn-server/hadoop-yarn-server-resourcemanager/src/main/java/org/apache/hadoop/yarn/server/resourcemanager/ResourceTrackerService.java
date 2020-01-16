@@ -140,11 +140,11 @@ public class ResourceTrackerService extends AbstractService implements
           + " should be larger than 0.");
     }
 
-    // 单个可申请的最小/最大内存资源量
+    // 单个可申请的最小内存资源量
     minAllocMb = conf.getInt(
     	YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
     	YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_MB);
-    // 单个可申请的最小/最大虚拟CPU个数
+    // 单个可申请的最小虚拟CPU个数
     minAllocVcores = conf.getInt(
     	YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES,
     	YarnConfiguration.DEFAULT_RM_SCHEDULER_MINIMUM_ALLOCATION_VCORES);
@@ -262,7 +262,7 @@ public class ResourceTrackerService extends AbstractService implements
     String host = nodeId.getHost();
     int cmPort = nodeId.getPort();
     int httpPort = request.getHttpPort();
-    Resource capability = request.getResource();
+    Resource capability = request.getResource(); // 获取该NodeManager的总资源数量信息
     String nodeManagerVersion = request.getNMVersion();
 
     RegisterNodeManagerResponse response = recordFactory

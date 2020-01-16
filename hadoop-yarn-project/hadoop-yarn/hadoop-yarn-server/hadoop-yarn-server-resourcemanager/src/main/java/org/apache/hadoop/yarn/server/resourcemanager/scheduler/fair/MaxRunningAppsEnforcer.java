@@ -54,16 +54,21 @@ public class MaxRunningAppsEnforcer {
   /**
    * Checks whether making the application runnable would exceed any
    * maxRunningApps limits.
+   * 检查正在运行的任务数量是否超过最大运行任务数量限制
    */
   public boolean canAppBeRunnable(FSQueue queue, String user) {
+    // 获取调度队列配置和用户提交的任务数量信息
     AllocationConfiguration allocConf = scheduler.getAllocationConfiguration();
     Integer userNumRunnable = usersNumRunnableApps.get(user);
     if (userNumRunnable == null) {
       userNumRunnable = 0;
     }
+    // 如果用户提交的处于运行中的任务数量大于对应用户最大运行任务数，则返回false
     if (userNumRunnable >= allocConf.getUserMaxApps(user)) {
       return false;
     }
+
+    // 如果当前队列运行任务数大于父队列最大运行任务数限制，则返回false
     // Check queue and all parent queues
     while (queue != null) {
       int queueMaxApps = allocConf.getQueueMaxApps(queue.getName());
@@ -79,17 +84,20 @@ public class MaxRunningAppsEnforcer {
   /**
    * Tracks the given new runnable app for purposes of maintaining max running
    * app limits.
+   * 记录新任务，便于进行最大任务数判断
    */
   public void trackRunnableApp(FSAppAttempt app) {
     String user = app.getUser();
     FSLeafQueue queue = app.getQueue();
     // Increment running counts for all parent queues
+    // 为所有父队列增加运行任务数
     FSParentQueue parent = queue.getParent();
     while (parent != null) {
       parent.incrementRunnableApps();
       parent = parent.getParent();
     }
 
+    // 记录对应用户提交的任务数量信息
     Integer userNumRunnable = usersNumRunnableApps.get(user);
     usersNumRunnableApps.put(user, (userNumRunnable == null ? 0
         : userNumRunnable) + 1);

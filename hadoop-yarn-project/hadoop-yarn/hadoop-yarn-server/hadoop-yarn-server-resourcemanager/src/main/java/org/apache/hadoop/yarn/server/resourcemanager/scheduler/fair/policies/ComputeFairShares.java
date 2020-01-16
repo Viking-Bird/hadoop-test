@@ -121,6 +121,8 @@ public class ComputeFairShares {
     // Find an upper bound on R that we can use in our binary search. We start
     // at R = 1 and double it until we have either used all the resources or we
     // have met all Schedulables' max shares.
+    //找到一个我们准备用在二分查找的R的上限值，我们将R初始化为1，然后每次翻倍，直到所有的Schedulable
+    //已经用完了所有的资源或者所有Schedulables已经达到了自己的maxShare
     int totalMaxShare = 0;
     for (Schedulable sched : schedulables) {
       int maxShare = getResourceValue(sched.getMaxShare(), type);

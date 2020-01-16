@@ -178,6 +178,13 @@ public class FSParentQueue extends FSQueue {
     return assigned;
   }
 
+  /**
+   * 从root queue开始，找出一个可以被抢占的container进行抢占。
+   * 决策和遍历过程实际上是一个递归调用的过程，从root queue开始，不断
+   * 由下级队列决定抢占自己下一级的哪个queue或者application或者container
+   * 最终，是由LeafQueue选择一个Application，然后Application选择一个
+   * Container
+   */
   @Override
   public RMContainer preemptContainer() {
     RMContainer toBePreempted = null;
@@ -185,6 +192,7 @@ public class FSParentQueue extends FSQueue {
     // Find the childQueue which is most over fair share
     FSQueue candidateQueue = null;
     Comparator<Schedulable> comparator = policy.getComparator();
+    //从自己所有的子队列中选择一个最应该被抢占的队列
     for (FSQueue queue : childQueues) {
       if (candidateQueue == null ||
           comparator.compare(queue, candidateQueue) > 0) {
@@ -193,6 +201,7 @@ public class FSParentQueue extends FSQueue {
     }
 
     // Let the selected queue choose which of its container to preempt
+    //选择出来了一个待抢占的队列以后，让这个队列自行决定抢占哪个container，采用**递归**调用的方式
     if (candidateQueue != null) {
       toBePreempted = candidateQueue.preemptContainer();
     }

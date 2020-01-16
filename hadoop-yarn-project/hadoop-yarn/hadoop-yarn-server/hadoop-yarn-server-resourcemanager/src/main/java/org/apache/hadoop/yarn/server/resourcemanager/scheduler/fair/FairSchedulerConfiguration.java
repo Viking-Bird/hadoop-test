@@ -42,6 +42,7 @@ public class FairSchedulerConfiguration extends Configuration {
   
   /** Increment request grant-able by the RM scheduler. 
    * These properties are looked up in the yarn-site.xml  */
+  //每次增量分配的内存和CPU数量
   public static final String RM_SCHEDULER_INCREMENT_ALLOCATION_MB =
     YarnConfiguration.YARN_PREFIX + "scheduler.increment-allocation-mb";
   public static final int DEFAULT_RM_SCHEDULER_INCREMENT_ALLOCATION_MB = 1024;

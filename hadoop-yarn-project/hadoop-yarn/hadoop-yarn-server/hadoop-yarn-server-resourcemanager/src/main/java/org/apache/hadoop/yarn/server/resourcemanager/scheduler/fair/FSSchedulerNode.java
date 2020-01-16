@@ -49,6 +49,7 @@ public class FSSchedulerNode extends SchedulerNode {
     RMContainer reservedContainer = getReservedContainer();
     if (reservedContainer != null) {
       // Sanity check
+      //如果这个container试图再次在这个节点上进行reservation，则抛出异常
       if (!container.getContainer().getNodeId().equals(getNodeID())) {
         throw new IllegalStateException("Trying to reserve" +
             " container " + container +
@@ -56,7 +57,8 @@ public class FSSchedulerNode extends SchedulerNode {
             " when currently" + " reserved resource " + reservedContainer +
             " on node " + reservedContainer.getReservedNode());
       }
-      
+
+      //一个节点不可以为超过两个application进行reservation
       // Cannot reserve more than one application on a given node!
       if (!reservedContainer.getContainer().getId().getApplicationAttemptId()
           .equals(container.getContainer().getId().getApplicationAttemptId())) {

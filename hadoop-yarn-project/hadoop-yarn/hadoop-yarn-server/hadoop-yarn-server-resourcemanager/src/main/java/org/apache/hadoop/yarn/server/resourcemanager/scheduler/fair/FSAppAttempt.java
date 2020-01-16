@@ -166,6 +166,7 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
     Resource resource = reservedContainer.getContainer().getResource();
     Resources.subtractFrom(currentReservation, resource);
 
+    // 打印出application当前节点上预留的container数量、预留container的优先级和预留资源
     LOG.info("Application " + getApplicationId() + " unreserved " + " on node "
         + node + ", currently has " + reservedContainers.size() + " at priority "
         + priority + "; currentReservation " + currentReservation);
@@ -489,10 +490,10 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
       FSSchedulerNode node, ResourceRequest request, NodeType type,
       boolean reserved) {
 
-    // How much does this request need?
+    // How much does this request need? 需要分配的资源
     Resource capability = request.getCapability();
 
-    // How much does the node have?
+    // How much does the node have? 节点可用资源
     Resource available = node.getAvailableResource();
 
     Container container = null;
@@ -555,6 +556,7 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
     // (not scheduled) in order to promote better locality.
     synchronized (this) {
       for (Priority priority : prioritiesToTry) {
+        // 如果该优先级对应的资源请求量小于等于0且该节点剩余资源不能分配这个container，则跳出本次循环
         if (getTotalRequiredResources(priority) <= 0 ||
             !hasContainerForNode(priority, node)) {
           continue;
@@ -631,6 +633,9 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
   }
 
   /**
+   * 当一个container已经处于预留状态，这个方法被调用，用来尝试对这个处于预留状态的container进行分配，
+   * 即，尝试将这个container从reserved状态变成allocation状态
+   *
    * Called when this application already has an existing reservation on the
    * given node.  Sees whether we can turn the reservation into an allocation.
    * Also checks whether the application needs the reservation anymore, and
@@ -640,12 +645,12 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
    *     Node that the application has an existing reservation on
    */
   public Resource assignReservedContainer(FSSchedulerNode node) {
-    RMContainer rmContainer = node.getReservedContainer();
+    RMContainer rmContainer = node.getReservedContainer(); //获取这个处于预留状态的container
     Priority priority = rmContainer.getReservedPriority();
 
     // Make sure the application still needs requests at this priority
-    if (getTotalRequiredResources(priority) == 0) {
-      unreserve(priority, node);
+    if (getTotalRequiredResources(priority) == 0) { // 确认当前这个priority还有没有请求的资源，如果没有了，这个预留也没必要了，需要取消预留
+      unreserve(priority, node); //进行unreserve操作
       return Resources.none();
     }
 
@@ -653,36 +658,40 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
     // Note that we have an assumption here that there's only one container size
     // per priority.
     if (!Resources.fitsIn(node.getReservedContainer().getReservedResource(),
-        node.getAvailableResource())) {
+        node.getAvailableResource())) { //如果发现这个节点的可用资源还是满足不了这个预定的container的资源需求，则此次分配失败
       return Resources.none();
     }
 
+    //发现节点可用资源已经大于这个container的资源请求，则可以尝试进行资源预留
     return assignContainer(node, true);
   }
 
 
   /**
+   * 如果节点总资源量充足，判断这个应用是否有container请求可以在这个节点上分配
    * Whether this app has containers requests that could be satisfied on the
    * given node, if the node had full space.
+   * 返回true，则说明这个在这个节点上进行预订的app或许可以从预定状态变成分配状态了
+   * 返回false，说明这个预定的container实际上不可以在这个服务器上运行，因此没有必要继续空占资源，防止资源被长期无效占用
    */
   public boolean hasContainerForNode(Priority prio, FSSchedulerNode node) {
     //查找这个优先级下面目前三种请求，一种是没有任何本地化限制的请求，一种是限制为本地机架的请求，一种是限制为本节点内的请求
-    ResourceRequest anyRequest = getResourceRequest(prio, ResourceRequest.ANY);
-    ResourceRequest rackRequest = getResourceRequest(prio, node.getRackName());
-    ResourceRequest nodeRequest = getResourceRequest(prio, node.getNodeName());
+    ResourceRequest anyRequest = getResourceRequest(prio, ResourceRequest.ANY); //任意机器的请求，对机架和节点没有要求
+    ResourceRequest rackRequest = getResourceRequest(prio, node.getRackName()); //在这个节点所在机架上的请求
+    ResourceRequest nodeRequest = getResourceRequest(prio, node.getNodeName()); //在这个节点上的请求
 
     return
         // There must be outstanding requests at the given priority:
-        anyRequest != null && anyRequest.getNumContainers() > 0 &&
+        anyRequest != null && anyRequest.getNumContainers() > 0 && // 任意机器上的请求是否是否大于0
             // If locality relaxation is turned off at *-level, there must be a
             // non-zero request for the node's rack:
             (anyRequest.getRelaxLocality() ||
-                (rackRequest != null && rackRequest.getNumContainers() > 0)) &&
+                (rackRequest != null && rackRequest.getNumContainers() > 0)) &&  // 机架范围的请求是否大于0
             // If locality relaxation is turned off at rack-level, there must be a
             // non-zero request at the node:
             (rackRequest == null || rackRequest.getRelaxLocality() ||
-                (nodeRequest != null && nodeRequest.getNumContainers() > 0)) &&
-            // The requested container must be able to fit on the node:
+                (nodeRequest != null && nodeRequest.getNumContainers() > 0)) &&   //本地机器上的请求是否大于0
+            // The requested container must be able to fit on the node: // 判断container所需资源量是否小于节点总资源量
             Resources.lessThanOrEqual(RESOURCE_CALCULATOR, null,
                 anyRequest.getCapability(), node.getRMNode().getTotalCapability());
   }
@@ -790,7 +799,10 @@ public class FSAppAttempt extends SchedulerApplicationAttempt
     }
 
     RMContainer toBePreempted = null;
+    //获取自己所有的running container
     for (RMContainer container : getLiveContainers()) {
+      //使用比较器RMContainerComparator选择出一个最应该被抢占的container
+      //规则就是比较优先级，选择一个优先级较低的container，如果优先级相同,则比较containerId并选择一个id比较小的container
       if (!getPreemptionContainers().contains(container) &&
           (toBePreempted == null ||
               comparator.compare(toBePreempted, container) > 0)) {

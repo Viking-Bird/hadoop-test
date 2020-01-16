@@ -494,7 +494,8 @@ public class ResourceManager extends CompositeService implements Recoverable {
       addService(nodesListManager);
       rmContext.setNodesListManager(nodesListManager);
 
-      // Initialize the scheduler  初始化调度器
+      // Initialize the scheduler
+      // 初始化资源分配模块，负责按照一定规则，将队列资源分配给各个应用程序，默认CapacityScheduler
       scheduler = createScheduler();
       scheduler.setRMContext(rmContext);
       addIfService(scheduler);

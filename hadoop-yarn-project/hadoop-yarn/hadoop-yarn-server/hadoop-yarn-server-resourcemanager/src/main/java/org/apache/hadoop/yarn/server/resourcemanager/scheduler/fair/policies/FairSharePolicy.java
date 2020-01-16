@@ -135,7 +135,7 @@ public class FairSharePolicy extends SchedulingPolicy {
   public void computeSteadyShares(Collection<? extends FSQueue> queues,
       Resource totalResources) {
     ComputeFairShares.computeSteadyShares(queues, totalResources,
-        ResourceType.MEMORY);
+        ResourceType.MEMORY); //对于FairSharePolicy，只以内存作为参考值，不考虑vCore
   }
 
   @Override

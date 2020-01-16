@@ -300,6 +300,9 @@ public class FSLeafQueue extends FSQueue {
     FSAppAttempt candidateSched = null;
     readLock.lock();
     try {
+      //从该叶子队列中的所有application中，选择一个更应该被强占的application
+      //如果使用默认Policy FairSharePolicy,那么选择标准就是该Application当前资源
+      //的欠缺或者充裕程度，资源越充裕，越可能被选中
       for (FSAppAttempt sched : runnableApps) {
         if (candidateSched == null ||
             comparator.compare(sched, candidateSched) > 0) {
@@ -312,6 +315,7 @@ public class FSLeafQueue extends FSQueue {
 
     // Preempt from the selected app
     if (candidateSched != null) {
+      //由于是叶子队列，因此candidateSched肯定是一个APP，即FSAppAttempt对象
       toBePreempted = candidateSched.preemptContainer();
     }
     return toBePreempted;

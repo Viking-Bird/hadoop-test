@@ -344,24 +344,34 @@ public class FairScheduler extends
    * such queues exist, compute how many tasks of each type need to be preempted
    * and then select the right ones using preemptTasks.
    */
+  /**
+   * 检查所有缺乏资源的Scheduler, 无论它缺乏资源是因为处于minShare的时间超过了minSharePreemptionTimeout
+   * 还是因为它处于fairShare的时间已经超过了fairSharePreemptionTimeout。在统计了所有Scheduler
+   * 缺乏的资源并求和以后，就开始尝试进行资源抢占。
+   */
   protected synchronized void preemptTasksIfNecessary() {
-    if (!shouldAttemptPreemption()) {
+    if (!shouldAttemptPreemption()) { //检查集群是否允许抢占发生
       return;
     }
 
+    //还没有到抢占时机，等下一次机会吧
     long curTime = getClock().getTime();
     if (curTime - lastPreemptCheckTime < preemptionInterval) {
       return;
     }
     lastPreemptCheckTime = curTime;
 
+    //初始化抢占参数为none，即什么也不抢占
     Resource resToPreempt = Resources.clone(Resources.none());
     for (FSLeafQueue sched : queueMgr.getLeafQueues()) {
+      //计算所有叶子队列需要抢占的资源，累加到资源变量resToPreempt中
       Resources.addTo(resToPreempt, resToPreempt(sched, curTime));
     }
+
+    //如果需要抢占的资源大于Resources.none()，即大于0
     if (Resources.greaterThan(RESOURCE_CALCULATOR, clusterResource, resToPreempt,
         Resources.none())) {
-      preemptResources(resToPreempt);
+      preemptResources(resToPreempt); //已经计算得到需要抢占多少资源，那么，下面就开始抢占了
     }
   }
 
@@ -376,6 +386,15 @@ public class FairScheduler extends
    * containers with lowest priority to preempt.
    * We make sure that no queue is placed below its fair share in the process.
    */
+  /**
+   * 基于已经计算好的需要抢占的资源（toPreempt()方法）进行资源抢占。每一轮抢占，我们从root 队列开始，
+   * 一级一级往下进行，直到我们选择了一个候选的application.当然，抢占分优先级进行。
+   * 依据每一个队列的policy，抢占方式有所不同。对于fair policy或者drf policy, 会选择超过
+   * fair share（这里的fair scheduler都是指Instantaneous Fair Share）
+   * 最多的ChildSchedulable进行抢占，但是，如果是fifo policy,则选择最后执行的application进行
+   * 抢占。当然，同一个application往往含有多个container，因此同一个application内部container
+   * 的抢占也分优先级。
+   */
   protected void preemptResources(Resource toPreempt) {
     long start = getClock().getTime();
     if (Resources.equals(toPreempt, Resources.none())) {
@@ -385,6 +404,9 @@ public class FairScheduler extends
     // Scan down the list of containers we've already warned and kill them
     // if we need to.  Remove any containers from the list that we don't need
     // or that are no longer running.
+    // warnedContainers，被警告的container，即在前面某轮抢占中被认为满足被抢占条件的container
+    // 同样，yarn发现一个container满足被抢占规则，绝对不是立刻抢占，而是等待一个超时时间，
+    // 试图让app自动释放这个container，如果到了超时时间还是没有，那么就可以直接kill了
     Iterator<RMContainer> warnedIter = warnedContainers.iterator();
     while (warnedIter.hasNext()) {
       RMContainer container = warnedIter.next();
@@ -407,15 +429,19 @@ public class FairScheduler extends
         }
       }
 
+      //toPreempt代表了目前仍需要抢占的资源，通过不断循环，一轮一轮抢占，toPreempt逐渐减小
       while (Resources.greaterThan(RESOURCE_CALCULATOR, clusterResource,
-          toPreempt, Resources.none())) {
+          toPreempt, Resources.none())) { //只要还没有达到抢占要求
+        //通过具体队列的Policy要求，选择一个container用来被抢占
         RMContainer container =
             getQueueManager().getRootQueue().preemptContainer();
         if (container == null) {
           break;
         } else {
+          //找到了一个待抢占的container,同样，警告或者杀死这个container
           warnOrKillContainer(container);
           warnedContainers.add(container);
+          //重新计算剩余需要抢占的资源
           Resources.subtractFrom(
               toPreempt, container.getContainer().getResource());
         }
@@ -446,6 +472,7 @@ public class FairScheduler extends
     if (time != null) {
       // if we asked for preemption more than maxWaitTimeBeforeKill ms ago,
       // proceed with kill
+      //如果这个container在以前已经被标记为需要被抢占，并且时间已经超过了maxWaitTimeBeforeKill，那么这个container可以直接杀死了
       if (time + waitTimeBeforeKill < getClock().getTime()) {
         ContainerStatus status =
           SchedulerUtils.createPreemptedContainerStatus(
@@ -460,12 +487,14 @@ public class FairScheduler extends
             (getClock().getTime() - time) + "ms)");
       }
     } else {
+      //把这个container标记为可能被抢占，也就是所谓的container警告，在下一轮或者几轮，都会拿出这个container判断是否超过了maxWaitTimeBeforeKill，如果超过了，则可以直接杀死了。
       // track the request in the FSAppAttempt itself
       app.addPreemption(container, getClock().getTime());
     }
   }
 
   /**
+   *
    * Return the resource amount that this queue is allowed to preempt, if any.
    * If the queue has been below its min share for at least its preemption
    * timeout, it should preempt the difference between its current share and
@@ -475,20 +504,40 @@ public class FairScheduler extends
    * max of the two amounts (this shouldn't happen unless someone sets the
    * timeouts to be identical for some reason).
    */
+  /**
+   * 计算这个队列允许抢占其它队列的资源大小。如果这个队列使用的资源低于其最小资源的时间超过了抢占超时时间，那么，
+   * 应该抢占的资源量就在它当前的fair share和它的min share之间的差额。如果队列资源已经低于它的fair share
+   * 的时间超过了fairSharePreemptionTimeout，那么他应该进行抢占的资源就是满足其fair share的资源总量。
+   * 如果两者都发生了，则抢占两个的较多者。
+   */
   protected Resource resToPreempt(FSLeafQueue sched, long curTime) {
+    //minSharePreemptionTimeout，表示如果超过该指定时间，Scheduler还没有获得minShare的资源，则进行抢占
     long minShareTimeout = sched.getMinSharePreemptionTimeout();
+    //fairSharePreemptionTimeout 表示如果超过该指定时间，Scheduler还没有获得fairShare的资源，则进行抢占
     long fairShareTimeout = sched.getFairSharePreemptionTimeout();
-    Resource resDueToMinShare = Resources.none();
-    Resource resDueToFairShare = Resources.none();
+    Resource resDueToMinShare = Resources.none();//因为资源低于minShare而需要抢占的资源总量
+    Resource resDueToFairShare = Resources.none();//因为资源低于fairShare 而需要抢占的资源总量
+    //时间超过minSharePreemptionTimeout，则可以判断资源是否低于minShare
     if (curTime - sched.getLastTimeAtMinShare() > minShareTimeout) {
+      //选取sched.getMinShare()和sched.getDemand()中的较小值，demand代表队列资源需求量，即处于等待或者运行状态下的应用程序尚需的资源量
       Resource target = Resources.min(RESOURCE_CALCULATOR, clusterResource,
           sched.getMinShare(), sched.getDemand());
+      //选取Resources.none（即0）和 Resources.subtract(target, sched.getResourceUsage())中的较大值，即
+      //如果最小资源需求量大于资源使用量，则取其差额，否则，取0，代表minShare已经满足条件，无需进行抢占
       resDueToMinShare = Resources.max(RESOURCE_CALCULATOR, clusterResource,
           Resources.none(), Resources.subtract(target, sched.getResourceUsage()));
     }
+    //时间超过fairSharePreemptionTimeout，则可以判断资源是否低于fairShare
     if (curTime - sched.getLastTimeAtFairShareThreshold() > fairShareTimeout) {
+      //选取sched.getFairShare()和sched.getDemand()中的较小值，demand代表队列资源需求量，即处于等待或者运行状态下的应用程序尚需的资源量
+      //如果需要2G资源，当前的fairshare是2.5G，则需要2.5G
       Resource target = Resources.min(RESOURCE_CALCULATOR, clusterResource,
           sched.getFairShare(), sched.getDemand());
+
+      //选取Resources.none（即0）和 Resources.subtract(target, sched.getResourceUsage())中的较大值，即
+      //如果fair share需求量大于资源使用量，则取其差额，否则，取0，代表minShare已经满足条件，无需进行抢占
+      //再拿2.5G和当前系统已经使用的资源做比较，如果2.5G-usedResource<0， 则使用Resources.none()，即不需要抢占
+      //否则，抢占资源量为2.5G-usedResource<0
       resDueToFairShare = Resources.max(RESOURCE_CALCULATOR, clusterResource,
           Resources.none(), Resources.subtract(target, sched.getResourceUsage()));
     }
@@ -646,11 +695,12 @@ public class FairScheduler extends
     }
     application.setCurrentAppAttempt(attempt);
 
+    // 如果正在运行的任务数量小于用户或者队列最大运行任务数量限制，则运行这个任务提交到队列中，并更新队列和用户运行任务的数量信息，否则，更新用户待运行任务的数量信息
     boolean runnable = maxRunningEnforcer.canAppBeRunnable(queue, user);
     queue.addApp(attempt, runnable);
-    if (runnable) {
+    if (runnable) { // 如果正在运行的任务数量小于最大运行任务数量，则记录正在运行任务数量信息
       maxRunningEnforcer.trackRunnableApp(attempt);
-    } else {
+    } else { // 如果正在运行的任务数量大于最大运行任务数量，则记录待运行任务数量信息
       maxRunningEnforcer.trackNonRunnableApp(attempt);
     }
     
@@ -972,7 +1022,7 @@ public class FairScheduler extends
     fsOpDurations.addNodeUpdateDuration(duration);
   }
 
-  void continuousSchedulingAttempt() throws InterruptedException {
+  void  continuousSchedulingAttempt() throws InterruptedException {
     long start = getClock().getTime();
     List<NodeId> nodeIdList = new ArrayList<NodeId>(nodes.keySet());
     // Sort the nodes by space available on them, so that we offer
@@ -1036,10 +1086,18 @@ public class FairScheduler extends
     // 1. Check for reserved applications
     // 2. Schedule if there are no reservations
 
+    // 获取这个节点上预留的application
     FSAppAttempt reservedAppSchedulable = node.getReservedAppSchedulable();
     if (reservedAppSchedulable != null) { //如果这个节点上已经有reservation
       Priority reservedPriority = node.getReservedContainer().getReservedPriority();
-      //如果这个节点被这个应用预定，这里就去判断这个应用是不是有能够分配到这个node上到请求，如果有这样到请求，并且，没有超过队列到剩余资源，那么，就可以把这个预定的资源尝试进行分配（有可能分配失败）
+
+      /**
+       * 之前有预留，不满足条件则释放
+       * 结合本地松弛特性，判断这个预留资源的应用是否有任何一个请求在这个节点上、在节点所在的机架上、在任意机器上运行：
+       * 1、如果该application在任意机器上或者该节点所在机架上的container需求已经为0，则释放预留的资源
+       * 2、如果该application在该节点没有container的需求，则释放预留的资源
+       * 3、如果该application在该节点有container的需求，但是该节点总资源量小于container需要的资源量，则释放预留的资源
+       */
       if (!reservedAppSchedulable.hasContainerForNode(reservedPriority, node)) {
         // Don't hold the reservation if app can no longer use it
         LOG.info("Releasing reservation that cannot be satisfied for application "
@@ -1059,21 +1117,30 @@ public class FairScheduler extends
         node.getReservedAppSchedulable().assignReservedContainer(node);
       }
     }
-    if (reservedAppSchedulable == null) { //这个节点还没有进行reservation，则尝试进行assignment
+    /**
+     * 这个节点还没有进行reservation，则尝试进行container分配
+     */
+    if (reservedAppSchedulable == null) {
       // No reservation, schedule at queue which is farthest below fair share
       int assignedContainers = 0;
-      while (node.getReservedContainer() == null) { //如果这个节点没有进行reservation，那么，就尝试
+      while (node.getReservedContainer() == null) { //如果这个节点没有预留的container信息，那么，就尝试给这个节点分配container
         boolean assignedContainer = false;
+        //尝试进行container的分配，并判断是否完全没有分配到并且也没有reserve成功
+        //如果分配到了资源，或者预留到了资源，总之不是none
         if (!queueMgr.getRootQueue().assignContainer(node).equals(
-            Resources.none())) { //尝试进行container的分配，并判断是否完全没有分配到并且也没有reserve成功
-          assignedContainers++; //如果分配到了资源，或者预留到了资源，总之不是none
+            Resources.none())) {
+          assignedContainers++;
           assignedContainer = true;
         }
+        // 如果分配container失败，则结束本次分配
         if (!assignedContainer) { break; }
+        // 如果没有开启批量分配特性，则结束本次分配
         if (!assignMultiple) { break; }
+        // 如果开启了批量分配特性，且已分配的container数量大于每次最多分配的container数量，则结束本次分配，否则一直尝试分配，一直分配可能会出现在该节点上预留资源
         if ((assignedContainers >= maxAssign) && (maxAssign > 0)) { break; }
       }
     }
+    // 更新队列的metric信息
     updateRootQueueMetrics();
   }
 
@@ -1104,7 +1171,8 @@ public class FairScheduler extends
    * @return true if preemption should be attempted, false otherwise.
    */
   private boolean shouldAttemptPreemption() {
-    if (preemptionEnabled) {
+    if (preemptionEnabled) { //首先检查配置文件是否打开抢占
+      // 检查整体集群资源利用率是否已经超过了yarn.scheduler.fair.preemption.cluster-utilization-threshold的配置值
       return (preemptionUtilizationThreshold < Math.max(
           (float) rootMetrics.getAllocatedMB() / clusterResource.getMemory(),
           (float) rootMetrics.getAllocatedVirtualCores() /
@@ -1222,6 +1290,7 @@ public class FairScheduler extends
     synchronized (this) {
       this.conf = new FairSchedulerConfiguration(conf);
       validateConf(this.conf);
+      // 获取NodeManager中配置的单个container请求的最小、最大CPU和内存数量信息，超过最大限制创建container将失败
       minimumAllocation = this.conf.getMinimumAllocation();
       maximumAllocation = this.conf.getMaximumAllocation();
       incrAllocation = this.conf.getIncrementAllocation();
@@ -1268,6 +1337,7 @@ public class FairScheduler extends
         throw new IOException("Failed to start FairScheduler", e);
       }
 
+      //创建更新线程，负责监控队列的状态并伺机进行抢占
       updateThread = new UpdateThread();
       updateThread.setName("FairSchedulerUpdateThread");
       updateThread.setDaemon(true);

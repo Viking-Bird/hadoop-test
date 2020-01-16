@@ -82,10 +82,10 @@ public abstract class ResourceRequest implements Comparable<ResourceRequest> {
       String labelExpression) {
     ResourceRequest request = Records.newRecord(ResourceRequest.class);
     request.setPriority(priority); // 资源优先级，值越小，优先级越高
-    request.setResourceName(hostName);
+    request.setResourceName(hostName); // 可以是某个节点的ip(NODE_LOCAL)，或者某个机架的ip(RACK_LOCAL)，或者是通配符*(OFF_SWITCH)
     request.setCapability(capability); // 所需的资源量：支持CPU和内存两种资源
     request.setNumContainers(numContainers); // 需要满足以上条件的资源数目
-    request.setRelaxLocality(relaxLocality);
+    request.setRelaxLocality(relaxLocality); // 是否允许某种本地化限制松弛到更低的要求，比如，当某个ResourceRequest要求其container运行在node1，但是node1的资源剩余量始终无法满足要求，那么需要进行本地化松弛，可以放弃必须运行在服务器node1的要求，改为只要求运行在这个服务器node1所在的机架rack1上就行
     request.setNodeLabelExpression(labelExpression);
     return request;
   }
