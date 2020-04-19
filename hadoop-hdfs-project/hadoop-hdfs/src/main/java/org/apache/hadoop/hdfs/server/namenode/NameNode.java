@@ -257,7 +257,7 @@ public class NameNode implements NameNodeStatusMXBean {
   public static final Log blockStateChangeLog = LogFactory.getLog("BlockStateChange");
   public static final HAState ACTIVE_STATE = new ActiveState();
   public static final HAState STANDBY_STATE = new StandbyState();
-  
+
   protected FSNamesystem namesystem; 
   protected final Configuration conf;
   protected final NamenodeRole role;
@@ -1393,7 +1393,7 @@ public class NameNode implements NameNodeStatusMXBean {
     setStartupOption(conf, startOpt);
 
     switch (startOpt) {
-      case FORMAT: {
+      case FORMAT: { //首次启动namenode要格式化，或者是重新初始化namenode
         boolean aborted = format(conf, startOpt.getForceFormat(),
             startOpt.getInteractiveFormat());
         terminate(aborted ? 1 : 0);
@@ -1405,7 +1405,7 @@ public class NameNode implements NameNodeStatusMXBean {
         terminate(0);
         return null;
       }
-      case FINALIZE: {
+      case FINALIZE: { //完成升级hadoop，删除备份
         System.err.println("Use of the argument '" + StartupOption.FINALIZE +
             "' is no longer supported. To finalize an upgrade, start the NN " +
             " and then run `hdfs dfsadmin -finalizeUpgrade'");

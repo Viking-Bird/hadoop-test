@@ -85,24 +85,24 @@ public final class HdfsServerConstants {
 
   /** Startup options */
   static public enum StartupOption{
-    FORMAT  ("-format"),
+    FORMAT  ("-format"), //格式化
     CLUSTERID ("-clusterid"),
     GENCLUSTERID ("-genclusterid"),
-    REGULAR ("-regular"),
-    BACKUP  ("-backup"),
-    CHECKPOINT("-checkpoint"),
-    UPGRADE ("-upgrade"),
-    ROLLBACK("-rollback"),
-    FINALIZE("-finalize"),
-    ROLLINGUPGRADE("-rollingUpgrade"),
-    IMPORT  ("-importCheckpoint"),
-    BOOTSTRAPSTANDBY("-bootstrapStandby"),
-    INITIALIZESHAREDEDITS("-initializeSharedEdits"),
-    RECOVER  ("-recover"),
+    REGULAR ("-regular"), //默认选项，表示正常操作
+    BACKUP  ("-backup"), //备份
+    CHECKPOINT("-checkpoint"), //checkpoint操作
+    UPGRADE ("-upgrade"), //升级
+    ROLLBACK("-rollback"), //回滚
+    FINALIZE("-finalize"), //Finalize将删除文件系统的前一个状态。最近的升级将成为永久性的。回滚选项将不再可用。完成后，它关闭NameNode。
+    ROLLINGUPGRADE("-rollingUpgrade"),//滚动升级
+    IMPORT  ("-importCheckpoint"),//从checkpoint目录加载image数据并将其保存到当前目录，checkpoint目录从属性fs.checkpoint.dir中获得
+    BOOTSTRAPSTANDBY("-bootstrapStandby"),//允许通过从active NameNode复制最新的namespace snapshot来引导standby NameNode的存储目录。这在首次配置HA集群时使用。
+    INITIALIZESHAREDEDITS("-initializeSharedEdits"), //格式化一个新的共享编辑目录(shared edits dir)并复制足够的编辑日志片段(edit log segments)，以便可以启动standby NameNode。
+    RECOVER  ("-recover"), //恢复损坏文件系统中丢失的元数据
     FORCE("-force"),
     NONINTERACTIVE("-nonInteractive"),
-    RENAMERESERVED("-renameReserved"),
-    METADATAVERSION("-metadataVersion"),
+    RENAMERESERVED("-renameReserved"),//和upgrade操作配合使用
+    METADATAVERSION("-metadataVersion"),//验证配置的目录是否存在，然后打印软件和image的元数据版本。
     UPGRADEONLY("-upgradeOnly"),
     // The -hotswap constant should not be used as a startup option, it is
     // only used for StorageDirectory.analyzeStorage() in hot swap drive scenario.

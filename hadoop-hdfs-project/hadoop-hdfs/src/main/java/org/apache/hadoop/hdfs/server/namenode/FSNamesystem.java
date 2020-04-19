@@ -1017,8 +1017,8 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     final FSImage fsImage = getFSImage();
 
     // format before starting up if requested
-    if (startOpt == StartupOption.FORMAT) {
-      
+    if (startOpt == StartupOption.FORMAT) { // 如果启动选项类型为FORMAT（格式化），在启动之前需要进行格式化
+      // 对FSImage执行格式化操作
       fsImage.format(this, fsImage.getStorage().determineClusterId());// reuse current id
 
       startOpt = StartupOption.REGULAR;
@@ -1030,6 +1030,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
       // We shouldn't be calling saveNamespace if we've come up in standby state.
       // standby 状态不应该调用saveNamespace
       MetaRecoveryContext recovery = startOpt.createRecoveryContext();
+      // 根据启动选项及其对应存储目录(${dfs.name.dir})，分析存储目录，必要的话从先前的事务恢复过来
       final boolean staleImage
           = fsImage.recoverTransitionRead(startOpt, this, recovery);
       if (RollingUpgradeStartupOption.ROLLBACK.matches(startOpt) ||
