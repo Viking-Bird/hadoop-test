@@ -585,17 +585,21 @@ public class NameNode implements NameNodeStatusMXBean {
     UserGroupInformation.setConfiguration(conf);
     loginAsNameNodeUser(conf);
 
+    // 初始化metric
     NameNode.initMetrics(conf, this.getRole());
     StartupProgressMetrics.register(startupProgress);
 
+    // 启动httpServer
     if (NamenodeRole.NAMENODE == role) {
       startHttpServer(conf);
     }
 
     this.spanReceiverHost = SpanReceiverHost.getInstance(conf);
 
+    // 从`${dfs.namenode.name.dir}`目录加载fsimage与editlog，初始化FsNamesystem、FsDirectory、LeaseManager等
     loadNamesystem(conf);
 
+    // 创建RpcServer，封装了NameNodeRpcServer#clientRpcServer，支持ClientNamenodeProtocol、DatanodeProtocolPB等协议
     rpcServer = createRpcServer(conf);
     if (clientNamenodeAddress == null) {
       // This is expected for MiniDFSCluster. Set it now using 
@@ -609,11 +613,13 @@ public class NameNode implements NameNodeStatusMXBean {
       httpServer.setNameNodeAddress(getNameNodeAddress());
       httpServer.setFSImage(getFSImage());
     }
-    
+
+    // 启动JvmPauseMonitor等，反向监控JVM
     pauseMonitor = new JvmPauseMonitor(conf);
     pauseMonitor.start();
     metrics.getJvmMetrics().setPauseMonitor(pauseMonitor);
-    
+
+    // 启动多项重要的工作线程
     startCommonServices(conf);
   }
   
@@ -628,14 +634,18 @@ public class NameNode implements NameNodeStatusMXBean {
 
   /** Start the services common to active and standby states */
   private void startCommonServices(Configuration conf) throws IOException {
+    // 创建NameNodeResourceChecker、激活BlockManager等
     namesystem.startCommonServices(conf, haContext);
     registerNNSMXBean();
+    // 角色非`NamenodeRole.NAMENODE`的在此处启动HttpServer
     if (NamenodeRole.NAMENODE != role) {
       startHttpServer(conf);
       httpServer.setNameNodeAddress(getNameNodeAddress());
       httpServer.setFSImage(getFSImage());
     }
+    // 启动RPCServer
     rpcServer.start();
+    // 启动各插件
     plugins = conf.getInstances(DFS_NAMENODE_PLUGINS_KEY,
         ServicePlugin.class);
     for (ServicePlugin p: plugins) {
@@ -752,17 +762,21 @@ public class NameNode implements NameNodeStatusMXBean {
       throws IOException { 
     this.conf = conf;
     this.role = role;
+    // 设置NameNode#clientNamenodeAddress为"hdfs://localhost:9000"
     setClientNamenodeAddress(conf);
     String nsId = getNameServiceId(conf);
     String namenodeId = HAUtil.getNameNodeId(conf, nsId);
+    // HA相关
     this.haEnabled = HAUtil.isHAEnabled(conf, nsId);
     state = createHAState(getStartupOption(conf));
     this.allowStaleStandbyReads = HAUtil.shouldAllowStandbyReads(conf);
     this.haContext = createHAContext();
     try {
       initializeGenericKeys(conf, nsId, namenodeId);
+      // 完成实际的初始化工作
       initialize(conf);
       try {
+        // HA相关
         haContext.writeLock();
         state.prepareToEnterState(haContext);
         state.enterState(haContext);
@@ -798,6 +812,7 @@ public class NameNode implements NameNodeStatusMXBean {
    */
   public void join() {
     try {
+      // 等待RPCServer关闭，其他守护进程会自动关闭
       rpcServer.join();
     } catch (InterruptedException ie) {
       LOG.info("Caught interrupted exception ", ie);
@@ -1437,7 +1452,10 @@ public class NameNode implements NameNodeStatusMXBean {
         return null;
       }
       default: {
+        // 正常启动的话，满足startOpt == StartupOption.REGULAR，会走到default分支
+        // 初始化metric系统
         DefaultMetricsSystem.initialize("NameNode");
+        // 创建NameNode
         return new NameNode(conf);
       }
     }
@@ -1504,7 +1522,9 @@ public class NameNode implements NameNodeStatusMXBean {
 
     try {
       StringUtils.startupShutdownMessage(NameNode.class, argv, LOG);
+      // 创建namenode
       NameNode namenode = createNameNode(argv, null);
+      // 等待namenode关闭
       if (namenode != null) {
         namenode.join();
       }

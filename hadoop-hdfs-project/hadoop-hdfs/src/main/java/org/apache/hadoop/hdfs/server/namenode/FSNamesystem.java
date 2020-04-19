@@ -719,6 +719,8 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
    * Instantiates an FSNamesystem loaded from the image and edits
    * directories specified in the passed Configuration.
    *
+   * 从指定的目录加载image和edits文件
+   *
    * @param conf the Configuration which specifies the storage directories
    *             from which to load
    * @return an FSNamesystem which contains the loaded namespace
@@ -732,6 +734,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
         FSNamesystem.getNamespaceEditsDirs(conf));
     FSNamesystem namesystem = new FSNamesystem(conf, fsImage, false);
     StartupOption startOpt = NameNode.getStartupOption(conf);
+    // 如果是恢复操作的话，就设置NameNode进入安全点
     if (startOpt == StartupOption.RECOVER) {
       namesystem.setSafeMode(SafeModeAction.SAFEMODE_ENTER);
     }
@@ -779,17 +782,21 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     }
     providerOptions = KeyProvider.options(conf);
     this.codec = CryptoCodec.getInstance(conf);
+    // 判断是否开启异步写审计日志
     if (conf.getBoolean(DFS_NAMENODE_AUDIT_LOG_ASYNC_KEY,
                         DFS_NAMENODE_AUDIT_LOG_ASYNC_DEFAULT)) {
       LOG.info("Enabling async auditlog");
       enableAsyncAuditLog();
     }
+
+    // 获取公平锁模式属性，有助于防止写线程被耗尽，但是会降低锁吞吐量。
     boolean fair = conf.getBoolean("dfs.namenode.fslock.fair", true);
     LOG.info("fsLock is fair:" + fair);
     fsLock = new FSNamesystemLock(fair);
     cond = fsLock.writeLock().newCondition();
     this.fsImage = fsImage;
     try {
+      // 获取NameNode存储资源检查间隔
       resourceRecheckInterval = conf.getLong(
           DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_KEY,
           DFS_NAMENODE_RESOURCE_CHECK_INTERVAL_DEFAULT);
@@ -798,10 +805,12 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
       this.datanodeStatistics = blockManager.getDatanodeManager().getDatanodeStatistics();
       this.blockIdGenerator = new SequentialBlockIdGenerator(this.blockManager);
 
+      // 获取异构存储属性
       this.isStoragePolicyEnabled =
           conf.getBoolean(DFS_STORAGE_POLICY_ENABLED_KEY,
                           DFS_STORAGE_POLICY_ENABLED_DEFAULT);
 
+      // 权限相关
       this.fsOwner = UserGroupInformation.getCurrentUser();
       this.fsOwnerShortUserName = fsOwner.getShortUserName();
       this.supergroup = conf.get(DFS_PERMISSIONS_SUPERUSERGROUP_KEY, 
@@ -1015,9 +1024,11 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
       startOpt = StartupOption.REGULAR;
     }
     boolean success = false;
+    // 对加载FSImage动作加锁
     writeLock();
     try {
       // We shouldn't be calling saveNamespace if we've come up in standby state.
+      // standby 状态不应该调用saveNamespace
       MetaRecoveryContext recovery = startOpt.createRecoveryContext();
       final boolean staleImage
           = fsImage.recoverTransitionRead(startOpt, this, recovery);
@@ -1102,14 +1113,18 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     writeLock();
     this.haContext = haContext;
     try {
+      // 创建NameNodeResourceChecker，并立即检查一次
       nnResourceChecker = new NameNodeResourceChecker(conf);
       checkAvailableResources();
       assert safeMode != null && !isPopulatingReplQueues();
+      // 设置一些启动过程中的信息
       StartupProgress prog = NameNode.getStartupProgress();
       prog.beginPhase(Phase.SAFEMODE);
       prog.setTotal(Phase.SAFEMODE, STEP_AWAITING_REPORTED_BLOCKS,
         getCompleteBlocksTotal());
+      // 设置已完成的数据块总量
       setBlockTotal();
+      // 激活BlockManager
       blockManager.activate(conf);
     } finally {
       writeUnlock();
