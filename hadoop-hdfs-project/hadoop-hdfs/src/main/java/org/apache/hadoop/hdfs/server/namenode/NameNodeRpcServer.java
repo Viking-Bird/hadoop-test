@@ -1320,19 +1320,32 @@ class NameNodeRpcServer implements NamenodeProtocols {
     return UserGroupInformation.createRemoteUser(user).getGroupNames();
   }
 
+    /**
+     * 主要检查NameNode的磁盘空间是否可用，不可用则抛出HealthCheckFailedException异常
+     * @throws HealthCheckFailedException
+     * @throws AccessControlException
+     * @throws IOException
+     */
   @Override // HAServiceProtocol
   public synchronized void monitorHealth() throws HealthCheckFailedException,
       AccessControlException, IOException {
     checkNNStartup();
     nn.monitorHealth();
   }
-  
+
+    /**
+     * 将当前NameNode转换为active状态
+     * @param req
+     * @throws ServiceFailedException
+     * @throws AccessControlException
+     * @throws IOException
+     */
   @Override // HAServiceProtocol
   public synchronized void transitionToActive(StateChangeRequestInfo req) 
       throws ServiceFailedException, AccessControlException, IOException {
     checkNNStartup();
-    nn.checkHaStateChange(req);
-    nn.transitionToActive();
+    nn.checkHaStateChange(req); // 检查HA操作是否合法
+    nn.transitionToActive(); // 将NameNode状态转换active
   }
   
   @Override // HAServiceProtocol
