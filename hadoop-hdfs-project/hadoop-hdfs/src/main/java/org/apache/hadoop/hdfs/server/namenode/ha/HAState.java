@@ -54,11 +54,11 @@ abstract public class HAState {
    */
   protected final void setStateInternal(final HAContext context, final HAState s)
       throws ServiceFailedException {
-    prepareToExitState(context);
+    prepareToExitState(context);// 取消standby节点上正在进行的checkpoint操作
     s.prepareToEnterState(context);
     context.writeLock();
     try {
-      exitState(context);
+      exitState(context);//停止active或者standby节点的服务
       context.setState(s);
       s.enterState(context);
     } finally {

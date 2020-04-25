@@ -82,12 +82,14 @@ public class IPCLoggerChannel implements AsyncLogger {
   /**
    * Executes tasks submitted to it serially, on a single thread, in FIFO order
    * (generally used for write tasks that should not be reordered).
+   * 通常用于写不应该被重新排序的任务，一个IPCLoggerChannel实例拥有一个singleThreadExecutor对象
    */
   private final ListeningExecutorService singleThreadExecutor;
   /**
    * Executes tasks submitted to it in parallel with each other and with those
    * submitted to singleThreadExecutor (generally used for read tasks that can
    * be safely reordered and interleaved with writes).
+   * 通常用于可以安全地重新排序并与写交错的读任务
    */
   private final ListeningExecutorService parallelExecutor;
   private long ipcSerial = 0;
@@ -138,7 +140,7 @@ public class IPCLoggerChannel implements AsyncLogger {
    * the beginning of the next segment. Upon detecting this situation,
    * the writer sets this flag to true to avoid sending useless RPCs.
    */
-  private boolean outOfSync = false;
+  private boolean outOfSync = false; // 用于标识当前JN上写editlog的操作是否出现了错误
   
   /**
    * Stopwatch which starts counting on each heartbeat that is sent

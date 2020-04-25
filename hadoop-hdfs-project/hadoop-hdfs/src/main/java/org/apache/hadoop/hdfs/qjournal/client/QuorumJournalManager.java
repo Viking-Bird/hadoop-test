@@ -60,6 +60,9 @@ import com.google.common.collect.Lists;
 import com.google.protobuf.TextFormat;
 
 /**
+ * 实现了JournalManager接口中定义的管理editlog存储的所有方法，
+ * 负责向远程JournalNodes节点写入日志，每一次写操作都要求法定数量的JournalNode节点发送一个ack响应
+ *
  * A JournalManager that writes to a set of remote JournalNodes,
  * requiring a quorum of nodes to ack each write.
  */
@@ -68,6 +71,7 @@ public class QuorumJournalManager implements JournalManager {
   static final Log LOG = LogFactory.getLog(QuorumJournalManager.class);
 
   // Timeouts for which the QJM will wait for each of the following actions.
+  // QJM等待每种操作的超时时间
   private final int startSegmentTimeoutMs;
   private final int prepareRecoveryTimeoutMs;
   private final int acceptRecoveryTimeoutMs;
@@ -80,6 +84,7 @@ public class QuorumJournalManager implements JournalManager {
   // Since these don't occur during normal operation, we can
   // use rather lengthy timeouts, and don't need to make them
   // configurable.
+  //由于这些不会在正常的操作中发生，我们可以使用相当长的超时时间，而且不需要做成可配置的。
   private static final int FORMAT_TIMEOUT_MS            = 60000;
   private static final int HASDATA_TIMEOUT_MS           = 60000;
   private static final int CAN_ROLL_BACK_TIMEOUT_MS     = 60000;
@@ -113,10 +118,12 @@ public class QuorumJournalManager implements JournalManager {
     this.conf = conf;
     this.uri = uri;
     this.nsInfo = nsInfo;
+    // 构造AsyncLoggerSet对象，维护与集群中所有JournalNode的连接
     this.loggers = new AsyncLoggerSet(createLoggers(loggerFactory));
     this.connectionFactory = URLConnectionFactory
         .newDefaultURLConnectionFactory(conf);
 
+    // 配置各种超时时间
     // Configure timeouts.
     this.startSegmentTimeoutMs = conf.getInt(
         DFSConfigKeys.DFS_QJOURNAL_START_SEGMENT_TIMEOUT_KEY,
@@ -178,11 +185,13 @@ public class QuorumJournalManager implements JournalManager {
       throws IOException {
     Preconditions.checkState(!loggers.isEpochEstablished(),
         "epoch already created");
-    
+
+    // 获取集群中所有JN的lastPromisedEpoch变量
     Map<AsyncLogger, GetJournalStateResponseProto> lastPromises =
       loggers.waitForWriteQuorum(loggers.getJournalState(),
           getJournalStateTimeoutMs, "getJournalState()");
-    
+
+    // 统计出最大epoch number加1之后作为这个QJM的epoch number
     long maxPromised = Long.MIN_VALUE;
     for (GetJournalStateResponseProto resp : lastPromises.values()) {
       maxPromised = Math.max(maxPromised, resp.getLastPromisedEpoch());
@@ -398,10 +407,13 @@ public class QuorumJournalManager implements JournalManager {
       throws IOException {
     Preconditions.checkState(isActiveWriter,
         "must recover segments before starting a new one");
+    // 调用AsyncLogger.startLogSegment将写请求发送到所有JN上
     QuorumCall<AsyncLogger, Void> q = loggers.startLogSegment(txId,
         layoutVersion);
+    // 等待JN返回执行结果
     loggers.waitForWriteQuorum(q, startSegmentTimeoutMs,
         "startLogSegment(" + txId + ")");
+    // 构造QuorumOutputStream对象，并返回
     return new QuorumOutputStream(loggers, txId,
         outputBufferCapacity, writeTxnsTimeoutMs);
   }

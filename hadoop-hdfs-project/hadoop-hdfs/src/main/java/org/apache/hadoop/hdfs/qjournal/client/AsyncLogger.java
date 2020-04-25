@@ -45,6 +45,10 @@ import com.google.common.util.concurrent.ListenableFuture;
  * implementation.</li>
  * </ul>
  */
+
+/**
+ * QuorumJournalManager与JournalNode通信接口，将QJournalProtocol接口适配成带有异步调用机制的接口
+ */
 interface AsyncLogger {
   
   interface Factory {

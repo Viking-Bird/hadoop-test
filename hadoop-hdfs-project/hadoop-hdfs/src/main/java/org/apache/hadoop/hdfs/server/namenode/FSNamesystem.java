@@ -1158,9 +1158,11 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     LOG.info("Starting services required for active state");
     writeLock();
     try {
+      // 开启新的editlog输出流
       FSEditLog editLog = getFSImage().getEditLog();
       
       if (!editLog.isOpenForWrite()) {
+        // 对editlog进行恢复操作，与之前的active节点同步editlog内容
         // During startup, we're already open for write during initialization.
         editLog.initJournalsForWrite();
         // May need to recover
@@ -1169,13 +1171,18 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
         LOG.info("Catching up to latest edits from old active before " +
             "taking over writer role in edits logs");
         editLogTailer.catchupDuringFailover();
-        
+
+        // 由于已经切换为Active状态的NameNode，所以不再延迟处理数据块
         blockManager.setPostponeBlocksFromFuture(false);
+        // 新启动的Active NameNode需要等到所有DataNode更新心跳后，再触发删除与复制操作
         blockManager.getDatanodeManager().markAllDatanodesStale();
+        // 清除blockManager中的所有队列
         blockManager.clearQueues();
+        // 处理之前由于NameSpace信息不完整而延迟处理的数据块
         blockManager.processAllPendingDNMessages();
 
         // Only need to re-process the queue, If not in SafeMode.
+        // 重新生成复制队列以及删除队列
         if (!isInSafeMode()) {
           LOG.info("Reprocessing replication and invalidation queues");
           initializeReplQueues();
@@ -1186,7 +1193,8 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
               "replication and invalidation queues during failover:\n" +
               metaSaveAsString());
         }
-        
+
+        // 读取最新txid，重置editlog的txid，之后打开editlog
         long nextTxId = getFSImage().getLastAppliedTxId() + 1;
         LOG.info("Will take over writing edit logs at txnid " + 
             nextTxId);
@@ -1197,6 +1205,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
 
       // Enable quota checks.
       dir.enableQuotaChecks();
+      // 更新所有租约，并启动租约检查线程
       if (haEnabled) {
         // Renew all of the leases before becoming active.
         // This is because, while we were in standby mode,
@@ -1207,10 +1216,12 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
       leaseManager.startMonitor();
       startSecretManagerIfNecessary();
 
+      // 启动NameNode资源监控线程
       //ResourceMonitor required only at ActiveNN. See HDFS-2914
       this.nnrmthread = new Daemon(new NameNodeResourceMonitor());
       nnrmthread.start();
 
+      // 启动nnEditLogRoller线程
       nnEditLogRoller = new Daemon(new NameNodeEditLogRoller(
           editLogRollerThreshold, editLogRollerInterval));
       nnEditLogRoller.start();
@@ -1221,6 +1232,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
         lazyPersistFileScrubber.start();
       }
 
+      // 启动cacheManager监控线程
       cacheManager.startMonitorThread();
       blockManager.getDatanodeManager().setShouldSendCachingCommands(true);
     } finally {
@@ -1350,12 +1362,15 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
   /** Stop services required in standby state */
   void stopStandbyServices() throws IOException {
     LOG.info("Stopping services started for standby state");
+    // 关闭负责进行检查点操作的standbyCheckpointer线程
     if (standbyCheckpointer != null) {
       standbyCheckpointer.stop();
     }
+    // 关闭负责监控editlog内容的editLogTailer线程
     if (editLogTailer != null) {
       editLogTailer.stop();
     }
+    // 关闭当前的editlog
     if (dir != null && getFSImage() != null && getFSImage().editLog != null) {
       getFSImage().editLog.close();
     }

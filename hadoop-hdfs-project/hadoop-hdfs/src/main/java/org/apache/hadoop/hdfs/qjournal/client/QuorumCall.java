@@ -62,15 +62,19 @@ class QuorumCall<KEY, RESULT> {
   static <KEY, RESULT> QuorumCall<KEY, RESULT> create(
       Map<KEY, ? extends ListenableFuture<RESULT>> calls) {
     final QuorumCall<KEY, RESULT> qr = new QuorumCall<KEY, RESULT>();
+    // 循环执行回调函数
     for (final Entry<KEY, ? extends ListenableFuture<RESULT>> e : calls.entrySet()) {
       Preconditions.checkArgument(e.getValue() != null,
           "null future for key: " + e.getKey());
       Futures.addCallback(e.getValue(), new FutureCallback<RESULT>() {
+
+        // 如果异常，异常数加1
         @Override
         public void onFailure(Throwable t) {
           qr.addException(e.getKey(), t);
         }
 
+        // 如果成功返回，则成功数加1
         @Override
         public void onSuccess(RESULT res) {
           qr.addResult(e.getKey(), res);
@@ -85,6 +89,8 @@ class QuorumCall<KEY, RESULT> {
   }
   
   /**
+   * 循环检测成功响应、异常响应和超时响应
+   *
    * Wait for the quorum to achieve a certain number of responses.
    * 
    * Note that, even after this returns, more responses may arrive,
@@ -111,11 +117,15 @@ class QuorumCall<KEY, RESULT> {
     long et = st + millis;
     while (true) {
       checkAssertionErrors();
+      // 有足够的响应，则返回
       if (minResponses > 0 && countResponses() >= minResponses) return;
+      // 有足够的成功响应，则返回
       if (minSuccesses > 0 && countSuccesses() >= minSuccesses) return;
+      // 有足够的异常响应，则返回
       if (maxExceptions >= 0 && countExceptions() > maxExceptions) return;
       long now = Time.monotonicNow();
-      
+
+      // 计算等待时间
       if (now > nextLogTime) {
         long waited = now - st;
         String msg = String.format(
@@ -143,7 +153,7 @@ class QuorumCall<KEY, RESULT> {
       }
       rem = Math.min(rem, nextLogTime - now);
       rem = Math.max(rem, 1);
-      wait(rem);
+      wait(rem); // 等待响应
     }
   }
 

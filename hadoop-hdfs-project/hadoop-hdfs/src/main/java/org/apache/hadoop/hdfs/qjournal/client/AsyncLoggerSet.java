@@ -41,6 +41,9 @@ import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
 
 /**
+ * 提供一组AsyncLogger对象，对所有AsyncLogger对象上的调用进行封装，并提供QuorumCall对象保存所有JournalNode返回的结果，实现
+ * QuorumJournalManager与JournalNode之间的异步通信
+ *
  * Wrapper around a set of Loggers, taking care of fanning out
  * calls to the underlying loggers and constructing corresponding
  * {@link QuorumCall} instances.
@@ -48,7 +51,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 class AsyncLoggerSet {
   static final Log LOG = LogFactory.getLog(AsyncLoggerSet.class);
 
-  private final List<AsyncLogger> loggers;
+  private final List<AsyncLogger> loggers; // 保存JournalNode异步操作对象，一个JournalNode对应一个AsyncLogger操作对象
   
   private static final long INVALID_EPOCH = -1;
   private long myEpoch = INVALID_EPOCH;
@@ -234,6 +237,7 @@ class AsyncLoggerSet {
 
   public QuorumCall<AsyncLogger, Void> startLogSegment(
       long txid, int layoutVersion) {
+    // 用map保存调用结果，key为调用方法的对象，value为调用结果
     Map<AsyncLogger, ListenableFuture<Void>> calls = Maps.newHashMap();
     for (AsyncLogger logger : loggers) {
       calls.put(logger, logger.startLogSegment(txid, layoutVersion));

@@ -1578,11 +1578,12 @@ public class NameNode implements NameNodeStatusMXBean {
     HAServiceStatus ret = new HAServiceStatus(retState);
     if (retState == HAServiceState.STANDBY) {
       String safemodeTip = namesystem.getSafeModeTip();
+      // standby状态，且为safemode状态，则不可以切换为active状态
       if (!safemodeTip.isEmpty()) {
         ret.setNotReadyToBecomeActive(
             "The NameNode is in safemode. " +
             safemodeTip);
-      } else {
+      } else { 
         ret.setReadyToBecomeActive();
       }
     } else if (retState == HAServiceState.ACTIVE) {
