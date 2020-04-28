@@ -442,6 +442,7 @@ public final class FSImageFormatProtobuf {
 
     private void saveInternal(FileOutputStream fout,
         FSImageCompression compression, String filePath) throws IOException {
+      // 构造输出流，一边写入数据，一边写入校验值
       StartupProgress prog = NameNode.getStartupProgress();
       MessageDigest digester = MD5Hash.getDigester();
 
@@ -451,11 +452,12 @@ public final class FSImageFormatProtobuf {
 
       fileChannel = fout.getChannel();
 
+      // FileSummary为fsimage文件的描述部分，也是protobuf定义的
       FileSummary.Builder b = FileSummary.newBuilder()
           .setOndiskVersion(FSImageUtil.FILE_VERSION)
           .setLayoutVersion(NameNodeLayoutVersion.CURRENT_LAYOUT_VERSION);
 
-      codec = compression.getImageCodec();
+      codec = compression.getImageCodec(); // 获取压缩格式，并装饰输出流
       if (codec != null) {
         b.setCodec(codec.getClass().getCanonicalName());
         sectionOutputStream = codec.createOutputStream(underlyingOutputStream);
@@ -463,37 +465,37 @@ public final class FSImageFormatProtobuf {
         sectionOutputStream = underlyingOutputStream;
       }
 
-      saveNameSystemSection(b);
+      saveNameSystemSection(b); //保存命名空间信息
       // Check for cancellation right after serializing the name system section.
       // Some unit tests, such as TestSaveNamespace#testCancelSaveNameSpace
       // depends on this behavior.
-      context.checkCancelled();
+      context.checkCancelled(); //检查是否取消了保存操作
 
       Step step = new Step(StepType.INODES, filePath);
       prog.beginStep(Phase.SAVING_CHECKPOINT, step);
-      saveInodes(b);
-      saveSnapshots(b);
+      saveInodes(b); //保存命名空间中的inode信息
+      saveSnapshots(b);//保存快照信息
       prog.endStep(Phase.SAVING_CHECKPOINT, step);
 
       step = new Step(StepType.DELEGATION_TOKENS, filePath);
       prog.beginStep(Phase.SAVING_CHECKPOINT, step);
-      saveSecretManagerSection(b);
+      saveSecretManagerSection(b);//保存安全信息
       prog.endStep(Phase.SAVING_CHECKPOINT, step);
 
       step = new Step(StepType.CACHE_POOLS, filePath);
       prog.beginStep(Phase.SAVING_CHECKPOINT, step);
-      saveCacheManagerSection(b);
+      saveCacheManagerSection(b);//保存缓存信息
       prog.endStep(Phase.SAVING_CHECKPOINT, step);
 
-      saveStringTableSection(b);
+      saveStringTableSection(b);//保存StringTable
 
       // We use the underlyingOutputStream to write the header. Therefore flush
       // the buffered stream (which is potentially compressed) first.
-      flushSectionOutputStream();
+      flushSectionOutputStream();//flush输出流
 
       FileSummary summary = b.build();
-      saveFileSummary(underlyingOutputStream, summary);
-      underlyingOutputStream.close();
+      saveFileSummary(underlyingOutputStream, summary);//将FileSummary写入文件
+      underlyingOutputStream.close();//关闭底层输出流
       savedDigest = new MD5Hash(digester.digest());
     }
 

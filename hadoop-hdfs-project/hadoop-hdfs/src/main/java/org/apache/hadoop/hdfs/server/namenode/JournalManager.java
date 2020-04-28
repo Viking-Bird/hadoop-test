@@ -28,6 +28,7 @@ import org.apache.hadoop.hdfs.server.common.StorageInfo;
 import org.apache.hadoop.hdfs.server.protocol.NamespaceInfo;
 
 /**
+ * 负责在特定目录上持久化editlog文件
  * A JournalManager is responsible for managing a single place of storing
  * edit logs. It may correspond to multiple files, a backup node, etc.
  * Even when the actual underlying storage is rolled, or failed and restored,

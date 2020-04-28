@@ -531,10 +531,12 @@ public class INodeDirectory extends INodeWithAdditionalFields
   }
 
   public boolean addChild(INode node) {
+    // 首先找到INode节点在children列表中的位置
     final int low = searchChildren(node.getLocalNameBytes());
     if (low >= 0) {
       return false;
     }
+    // 将INode节点插入到children列表的low位置
     addChild(node, low);
     return true;
   }

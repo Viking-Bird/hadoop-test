@@ -1422,6 +1422,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
   }
 
   /**
+   *
    * Get all edits dirs which are required. If any shared edits dirs are
    * configured, these are also included in the set of required dirs.
    * 

@@ -52,6 +52,7 @@ import com.google.common.base.Preconditions;
 
 
 /**
+ * 当NameNode处于standby状态时，周期性从JournalNode获取editlog数据
  * EditLogTailer represents a thread which periodically reads from edits
  * journals and applies the transactions contained within to a given
  * FSNamesystem.
@@ -60,11 +61,14 @@ import com.google.common.base.Preconditions;
 @InterfaceStability.Evolving
 public class EditLogTailer {
   public static final Log LOG = LogFactory.getLog(EditLogTailer.class);
-  
+
+  // 编辑日志跟踪线程EditLogTailerThread实例tailerThread
   private final EditLogTailerThread tailerThread;
   
   private final Configuration conf;
   private final FSNamesystem namesystem;
+
+  // 文件系统编辑日志FSEditLog实例editLog
   private FSEditLog editLog;
 
   private InetSocketAddress activeAddr;
@@ -72,11 +76,13 @@ public class EditLogTailer {
 
   /**
    * The last transaction ID at which an edit log roll was initiated.
+   * 一次编辑日志滚动开始时的最新事务ID
    */
   private long lastRollTriggerTxId = HdfsConstants.INVALID_TXID;
   
   /**
    * The highest transaction ID loaded by the Standby.
+   * StandBy NameNode加载的最高事务ID
    */
   private long lastLoadedTxnId = HdfsConstants.INVALID_TXID;
 
@@ -90,12 +96,14 @@ public class EditLogTailer {
    * How often the Standby should roll edit logs. Since the Standby only reads
    * from finalized log segments, the Standby will only be as up-to-date as how
    * often the logs are rolled.
+   * StandBy NameNode滚动编辑日志的时间间隔。
    */
   private final long logRollPeriodMs;
 
   /**
    * How often the Standby should check if there are new finalized segment(s)
    * available to be read from.
+   * StandBy NameNode检查是否存在可以读取的新的最终日志段的时间间隔
    */
   private final long sleepTimeMs;
   
@@ -107,9 +115,11 @@ public class EditLogTailer {
     
     lastLoadTimestamp = now();
 
+    // StandBy NameNode滚动编辑日志的时间间隔logRollPeriodMs
+    // 取参数dfs.ha.log-roll.period，参数未配置默认为2min
     logRollPeriodMs = conf.getInt(DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY,
         DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_DEFAULT) * 1000;
-    if (logRollPeriodMs >= 0) {
+    if (logRollPeriodMs >= 0) { // 当获取滚动日志时间间隔大于0的话，获取Active NameNode的地址
       this.activeAddr = getActiveNodeAddress();
       Preconditions.checkArgument(activeAddr.getPort() > 0,
           "Active NameNode must have an IPC port configured. " +
@@ -120,7 +130,9 @@ public class EditLogTailer {
       LOG.info("Not going to trigger log rolls on active node because " +
           DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY + " is negative.");
     }
-    
+
+    // StandBy NameNode检查是否存在可以读取的新的最终日志段的时间间隔sleepTimeMs
+    // 取参数dfs.ha.tail-edits.period，参数未配置默认为1min
     sleepTimeMs = conf.getInt(DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_KEY,
         DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_DEFAULT) * 1000;
     
@@ -303,6 +315,7 @@ public class EditLogTailer {
     }
     
     private void doWork() {
+      // 标志位shouldRun为true时一直循环
       while (shouldRun) {
         try {
           // There's no point in triggering a log roll if the Standby hasn't

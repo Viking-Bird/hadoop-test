@@ -25,6 +25,7 @@ import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp;
 import org.apache.hadoop.io.DataOutputBuffer;
 
 /**
+ * 定义向持久化存储上写editlog文件的接口
  * EditLogOutputStream implementation that writes to a quorum of
  * remote journals.
  */

@@ -623,6 +623,7 @@ public class FSImage implements Closeable {
 
     Iterable<EditLogInputStream> editStreams = null;
 
+    // 获取edit文件IO流
     initEditLog(startOpt);
 
     if (NameNodeLayoutVersion.supports(
@@ -660,7 +661,8 @@ public class FSImage implements Closeable {
     if (!editStreams.iterator().hasNext()) {
       LOG.info("No edit log streams selected.");
     }
-    
+
+    // 加载FSImage文件
     FSImageFile imageFile = null;
     for (int i = 0; i < imageFiles.size(); i++) {
       try {
@@ -674,6 +676,7 @@ public class FSImage implements Closeable {
       }
     }
     // Failed to load any images, error out
+    // 加载失败，则抛出异常
     if (imageFile == null) {
       FSEditLog.closeAllStreams(editStreams);
       throw new IOException("Failed to load an FSImage file!");
@@ -681,6 +684,7 @@ public class FSImage implements Closeable {
     prog.endPhase(Phase.LOADING_FSIMAGE);
     
     if (!rollingRollback) {
+      // 调用loadEdit方法加载并合并editlog
       long txnsAdvanced = loadEdits(editStreams, target, startOpt, recovery);
       needToSave |= needsResaveBasedOnStaleCheckpoint(imageFile.getFile(),
           txnsAdvanced);
@@ -949,14 +953,16 @@ public class FSImage implements Closeable {
    */
   void saveFSImage(SaveNamespaceContext context, StorageDirectory sd,
       NameNodeFile dstType) throws IOException {
-    long txid = context.getTxId();
+    long txid = context.getTxId(); // 获取当前命名空间中保存的最新事务的txid
     File newFile = NNStorage.getStorageFile(sd, NameNodeFile.IMAGE_NEW, txid);
     File dstFile = NNStorage.getStorageFile(sd, dstType, txid);
-    
+
+    // 保存文件
     FSImageFormatProtobuf.Saver saver = new FSImageFormatProtobuf.Saver(context);
     FSImageCompression compression = FSImageCompression.createCompression(conf);
     saver.save(newFile, compression);
-    
+
+    // 保存MD5码校验值
     MD5FileUtils.saveMD5File(dstFile, saver.getSavedDigest());
     storage.setMostRecentCheckpointInfo(txid, Time.now());
   }
@@ -1065,13 +1071,16 @@ public class FSImage implements Closeable {
     boolean editLogWasOpen = editLog.isSegmentOpen();
     
     if (editLogWasOpen) {
+      // 将当前edit_inprogress文件关闭，并重命名
       editLog.endCurrentLogSegment(true);
     }
     long imageTxId = getLastAppliedOrWrittenTxId();
     try {
+      // 调用saveFSImageInAllDirs方法将当前的命名空间保存到最新的fsimage文件中
       saveFSImageInAllDirs(source, nnf, imageTxId, canceler);
       storage.writeAll();
     } finally {
+      // 开启新的edit_inprogress文件用于记录请求
       if (editLogWasOpen) {
         editLog.startLogSegment(imageTxId + 1, true);
         // Take this opportunity to note the current transaction.
@@ -1101,12 +1110,14 @@ public class FSImage implements Closeable {
     if (canceler == null) {
       canceler = new Canceler();
     }
+    // 构造保存命名空间操作上下文
     SaveNamespaceContext ctx = new SaveNamespaceContext(
         source, txid, canceler);
     
     try {
       List<Thread> saveThreads = new ArrayList<Thread>();
       // save images into current
+      // 在每一个保存路径上启动一个线程，该线程使用FSImageSaver类保存fsimage文件
       for (Iterator<StorageDirectory> it
              = storage.dirIterator(NameNodeDirType.IMAGE); it.hasNext();) {
         StorageDirectory sd = it.next();
@@ -1115,10 +1126,12 @@ public class FSImage implements Closeable {
         saveThreads.add(saveThread);
         saveThread.start();
       }
+      // 等待所有线程执行完毕
       waitForThreads(saveThreads);
       saveThreads.clear();
       storage.reportErrorsOnDirectories(ctx.getErrorSDs());
-  
+
+      // 保存文件失败则抛出异常
       if (storage.getNumStorageDirs(NameNodeDirType.IMAGE) == 0) {
         throw new IOException(
           "Failed to save in any storage directories while saving namespace.");
@@ -1128,11 +1141,13 @@ public class FSImage implements Closeable {
         ctx.checkCancelled(); // throws
         assert false : "should have thrown above!";
       }
-  
+
+      // 将fsimage.ckpt改名为fsimage
       renameCheckpoint(txid, NameNodeFile.IMAGE_NEW, nnf, false);
   
       // Since we now have a new checkpoint, we can clean up some
       // old edit logs and checkpoints.
+      // 已经完成了fsimage的保存，那么可以将存储上的一部分editlog和fsimage文件删除
       purgeOldStorage(nnf);
     } finally {
       // Notify any threads waiting on the checkpoint to be canceled
