@@ -120,10 +120,14 @@ public class AdminService extends CompositeService implements
 
   @Override
   public void serviceInit(Configuration conf) throws Exception {
+    //判断是否是HA
     if (rmContext.isHAEnabled()) {
+      //是否开启自动故障切换模式，默认是true
       autoFailoverEnabled = HAUtil.isAutomaticFailoverEnabled(conf);
       if (autoFailoverEnabled) {
+        //是否开启内置的自动故障切换模式，默认是true
         if (HAUtil.isAutomaticFailoverEmbedded(conf)) {
+          //使用此故障转移服务
           embeddedElector = createEmbeddedElectorService();
           addIfService(embeddedElector);
         }

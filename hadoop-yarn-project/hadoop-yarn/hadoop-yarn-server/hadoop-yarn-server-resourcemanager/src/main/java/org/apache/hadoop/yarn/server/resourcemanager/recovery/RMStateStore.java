@@ -140,7 +140,7 @@ public abstract class RMStateStore extends AbstractService {
         store.storeApplicationStateInternal(appId, appStateData);
         store.notifyApplication(new RMAppEvent(appId,
                RMAppEventType.APP_NEW_SAVED));
-      } catch (Exception e) {
+      } catch (Exception e) { // 捕获异常，调用notifyStoreOperationFailed方法进行故障转移操作
         LOG.error("Error storing app: " + appId, e);
         store.notifyStoreOperationFailed(e);
       }
@@ -820,24 +820,26 @@ public abstract class RMStateStore extends AbstractService {
 
   @SuppressWarnings("unchecked")
   /**
+   * 该方法通知RM存储操作失败
    * This method is called to notify the ResourceManager that the store
    * operation has failed.
    * @param failureCause the exception due to which the operation failed
    */
   protected void notifyStoreOperationFailed(Exception failureCause) {
     LOG.error("State store operation failed ", failureCause);
+    // 如果开启了HA，则执行故障转移操作
     if (HAUtil.isHAEnabled(getConfig())) {
       LOG.warn("State-store fenced ! Transitioning RM to standby");
       Thread standByTransitionThread =
           new Thread(new StandByTransitionThread());
       standByTransitionThread.setName("StandByTransitionThread Handler");
       standByTransitionThread.start();
-    } else if (YarnConfiguration.shouldRMFailFast(getConfig())) {
+    } else if (YarnConfiguration.shouldRMFailFast(getConfig())) { // 如果没有开启HA，则判断有没有开启快速失败
       LOG.fatal("Fail RM now due to state-store error!");
       rmDispatcher.getEventHandler().handle(
           new RMFatalEvent(RMFatalEventType.STATE_STORE_OP_FAILED,
               failureCause));
-    } else {
+    } else { // 否则，打印跳过存储异常警告信息
       LOG.warn("Skip the state-store error.");
     }
   }

@@ -466,10 +466,12 @@ public class YarnConfiguration extends Configuration {
   public static final String AUTO_FAILOVER_PREFIX =
       RM_HA_PREFIX + "automatic-failover.";
 
+  // 是否开启自动故障切换模式
   public static final String AUTO_FAILOVER_ENABLED =
       AUTO_FAILOVER_PREFIX + "enabled";
   public static final boolean DEFAULT_AUTO_FAILOVER_ENABLED = true;
 
+  // 是否使用内嵌的自动故障转移服务
   public static final String AUTO_FAILOVER_EMBEDDED =
       AUTO_FAILOVER_PREFIX + "embedded";
   public static final boolean DEFAULT_AUTO_FAILOVER_EMBEDDED = true;

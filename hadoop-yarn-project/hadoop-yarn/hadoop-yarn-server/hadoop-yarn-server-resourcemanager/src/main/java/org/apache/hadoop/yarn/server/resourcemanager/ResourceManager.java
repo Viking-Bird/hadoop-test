@@ -1069,6 +1069,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
   synchronized void transitionToStandby(boolean initialize)
       throws Exception {
+    //如果已经是standby模式，则返回
     if (rmContext.getHAServiceState() ==
         HAServiceProtocol.HAServiceState.STANDBY) {
       LOG.info("Already in standby state");
@@ -1078,6 +1079,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     LOG.info("Transitioning to standby state");
     HAServiceState state = rmContext.getHAServiceState();
     rmContext.setHAServiceState(HAServiceProtocol.HAServiceState.STANDBY);
+    //如果是active模式，就停掉所有的服务，RM HA的状态不是由自己启动过程来控制的
     if (state == HAServiceProtocol.HAServiceState.ACTIVE) {
       stopActiveServices();
       reinitialize(initialize);

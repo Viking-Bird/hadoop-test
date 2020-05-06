@@ -4296,7 +4296,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     } finally {
       writeUnlock();
     }
-    getEditLog().logSync();
+    getEditLog().logSync(); // 同步editlog日志
     if (status) {
       logAuditEvent(true, "mkdirs", srcArg, null, resultingStat);
     }

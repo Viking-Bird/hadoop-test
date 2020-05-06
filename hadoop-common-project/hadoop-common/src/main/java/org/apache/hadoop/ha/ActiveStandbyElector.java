@@ -154,7 +154,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   };
 
   private State state = State.INIT;
-  private int createRetryCount = 0;
+  private int createRetryCount = 0; // 保存当前重试次数
   private int statRetryCount = 0;
   private ZooKeeper zkClient;
   private WatcherWithClientRef watcher;
@@ -253,6 +253,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
       return;
     }
 
+    //复制一份节点信息的数组
     appData = new byte[data.length];
     System.arraycopy(data, 0, appData, 0, data.length);
 
@@ -411,6 +412,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
         "  for " + this);
 
     Code code = Code.get(rc);
+    //判断是否成功成为active节点
     if (isSuccess(code)) {
       // we successfully created the znode. we are the leader. start monitoring
       if (becomeActive()) {
@@ -793,15 +795,18 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
 
   private boolean becomeActive() {
     assert wantToBeInElection;
+    // 如果已经是active则返回
     if (state == State.ACTIVE) {
       // already active
       return true;
     }
     try {
+      //对失效的active节点的节点信息做一些校验和处理
       Stat oldBreadcrumbStat = fenceOldActive();
       writeBreadCrumbNode(oldBreadcrumbStat);
       
       LOG.debug("Becoming active for " + this);
+      //将此节点的RM设置成active
       appClient.becomeActive();
       state = State.ACTIVE;
       return true;
@@ -921,6 +926,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   }
 
   private void createLockNodeAsync() {
+    // 注册一个临时节点
     zkClient.create(zkLockFilePath, appData, zkAcl, CreateMode.EPHEMERAL,
         this, zkClient);
   }

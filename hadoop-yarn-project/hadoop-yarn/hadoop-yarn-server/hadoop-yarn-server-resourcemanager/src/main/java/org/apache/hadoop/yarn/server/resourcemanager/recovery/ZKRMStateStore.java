@@ -71,7 +71,7 @@ import java.util.List;
  */
 @Private
 @Unstable
-public class ZKRMStateStore extends RMStateStore {
+    public class ZKRMStateStore extends RMStateStore {
 
     public static final Log LOG = LogFactory.getLog(ZKRMStateStore.class);
     private final SecureRandom random = new SecureRandom();
@@ -243,10 +243,10 @@ public class ZKRMStateStore extends RMStateStore {
         zkAuths = RMZKUtils.getZKAuths(conf);
 
         zkRootNodePath = getNodePath(znodeWorkingPath, ROOT_ZNODE_NAME);
-        rmAppRoot = getNodePath(zkRootNodePath, RM_APP_ROOT);
+        rmAppRoot = getNodePath(zkRootNodePath, RM_APP_ROOT); // 获取任务信息存储路径，如：/rmstore/ZKRMStateRoot/RMAppRoot/
 
         /* Initialize fencing related paths, acls, and ops */
-        // 创建并删除fencingNodePath
+        // 构建创建和删除fencingNodePath的操作对象
         fencingNodePath = getNodePath(zkRootNodePath, FENCING_LOCK);
         createFencingNodePathOp = Op.create(fencingNodePath, new byte[0], zkAcl,
                 CreateMode.PERSISTENT);
@@ -444,6 +444,12 @@ public class ZKRMStateStore extends RMStateStore {
         return currentEpoch;
     }
 
+    /**
+     * RM启动时调用，恢复任务状态
+     *
+     * @return
+     * @throws Exception
+     */
     @Override
     public synchronized RMState loadState() throws Exception {
         RMState rmState = new RMState();
@@ -562,9 +568,11 @@ public class ZKRMStateStore extends RMStateStore {
     }
 
     private synchronized void loadRMAppState(RMState rmState) throws Exception {
+        // 当/rmstore/ZKRMStateRoot/RMAppRoot/节点及其子节点被删除或创建时，watch被触发
         List<String> childNodes = getChildrenWithRetries(rmAppRoot, true);
         for (String childNodeName : childNodes) {
             String childNodePath = getNodePath(rmAppRoot, childNodeName);
+            // 获取任务节点数据并注册watch，该watch当任务节点被删除或数据被更新时触发
             byte[] childData = getDataWithRetries(childNodePath, true);
             if (childNodeName.startsWith(ApplicationId.appIdStrPrefix)) {
                 // application
@@ -575,6 +583,7 @@ public class ZKRMStateStore extends RMStateStore {
                 ApplicationStateDataPBImpl appStateData =
                         new ApplicationStateDataPBImpl(
                                 ApplicationStateDataProto.parseFrom(childData));
+                // 获取任务数据
                 ApplicationState appState =
                         new ApplicationState(appStateData.getSubmitTime(),
                                 appStateData.getStartTime(),
@@ -587,6 +596,7 @@ public class ZKRMStateStore extends RMStateStore {
                             "from the application id");
                 }
                 rmState.appState.put(appId, appState);
+                // 获取任务重试数据
                 loadApplicationAttemptState(appState, appId);
             } else {
                 LOG.info("Unknown child node with name: " + childNodeName);
@@ -616,7 +626,7 @@ public class ZKRMStateStore extends RMStateStore {
                     dibb.reset(attemptStateData.getAppAttemptTokens());
                     credentials.readTokenStorageStream(dibb);
                 }
-
+                // 获取任务重试信息
                 ApplicationAttemptState attemptState =
                         new ApplicationAttemptState(attemptId,
                                 attemptStateData.getMasterContainer(), credentials,
@@ -651,6 +661,7 @@ public class ZKRMStateStore extends RMStateStore {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Storing info for app: " + appId + " at: " + nodeCreatePath);
         }
+        // 创建任务节点并存储任务数据
         byte[] appStateData = appStateDataPB.getProto().toByteArray();
         createWithRetries(nodeCreatePath, appStateData, zkAcl,
                 CreateMode.PERSISTENT);
@@ -677,7 +688,7 @@ public class ZKRMStateStore extends RMStateStore {
         // Application状态字节数组
         byte[] appStateData = appStateDataPB.getProto().toByteArray();
 
-        // 调用重试逻辑写数据
+        // 判断任务节点存在不存在，存在就更新数据，不存在就创建节点，并注册watch
         if (existsWithRetries(nodeUpdatePath, true) != null) {
             setDataWithRetries(nodeUpdatePath, appStateData, -1);
         } else {
@@ -708,6 +719,7 @@ public class ZKRMStateStore extends RMStateStore {
             LOG.debug("Storing info for attempt: " + appAttemptId + " at: "
                     + nodeCreatePath);
         }
+        // 创建任务节点并存储任务重试数据
         byte[] attemptStateData = attemptStateDataPB.getProto().toByteArray();
         createWithRetries(nodeCreatePath, attemptStateData, zkAcl,
                 CreateMode.PERSISTENT);
@@ -735,6 +747,7 @@ public class ZKRMStateStore extends RMStateStore {
         }
         byte[] attemptStateData = attemptStateDataPB.getProto().toByteArray();
 
+        // 更新任务重试数据，并注册watch
         if (existsWithRetries(nodeUpdatePath, true) != null) {
             setDataWithRetries(nodeUpdatePath, attemptStateData, -1);
         } else {
@@ -748,6 +761,7 @@ public class ZKRMStateStore extends RMStateStore {
 
     /**
      * 删除application状态信息
+     *
      * @param appState
      * @throws Exception
      */
@@ -758,7 +772,7 @@ public class ZKRMStateStore extends RMStateStore {
         String appIdRemovePath = getNodePath(rmAppRoot, appId); // 根据应用ID获取对应的路径
         ArrayList<Op> opList = new ArrayList<Op>();
 
-        // 先执行application重试信息删除操作，后删除application状态信息
+        // 先删除子节点上的任务重试信息，再删除任务信息
         for (ApplicationAttemptId attemptId : appState.attempts.keySet()) {
             String attemptRemovePath = getNodePath(appIdRemovePath, attemptId.toString());
             opList.add(Op.delete(attemptRemovePath, -1));
@@ -926,6 +940,13 @@ public class ZKRMStateStore extends RMStateStore {
         }
     }
 
+    /**
+     * 处理watcher事件
+     *
+     * @param zk
+     * @param event
+     * @throws Exception
+     */
     @VisibleForTesting
     @Private
     @Unstable
@@ -940,6 +961,7 @@ public class ZKRMStateStore extends RMStateStore {
         }
 
         Event.EventType eventType = event.getType();
+        // 输出watch事件信息
         LOG.info("Watcher event type: " + eventType + " with state:"
                 + event.getState() + " for path:" + event.getPath() + " for " + this);
 
@@ -947,7 +969,7 @@ public class ZKRMStateStore extends RMStateStore {
 
             // the connection state has changed
             switch (event.getState()) {
-                case SyncConnected:
+                case SyncConnected: // 已连接状态
                     LOG.info("ZKRMStateStore Session connected");
                     if (zkClient == null) {
                         // the SyncConnected must be from the client that sent Disconnected
@@ -956,11 +978,11 @@ public class ZKRMStateStore extends RMStateStore {
                         LOG.info("ZKRMStateStore Session restored");
                     }
                     break;
-                case Disconnected:
+                case Disconnected: // 断开状态
                     LOG.info("ZKRMStateStore Session disconnected");
                     zkClient = null;
                     break;
-                case Expired:
+                case Expired: // 超时状态，执行重连
                     // the connection got terminated because of session timeout
                     // call listener to reconnect
                     LOG.info("ZKRMStateStore Session expired");
@@ -1009,6 +1031,9 @@ public class ZKRMStateStore extends RMStateStore {
     }
 
     /**
+     * 创建、更新、删除操作都会在实际操作之前创建RM_ZK_FENCING_LOCK的文件，操作完成之后则删除对应的文件，multi中的操作是事务性的，这样意味着同时只有一个client去写rmstore目录，
+     * 当有两个rm同时写，创建RM_ZK_FENCING_LOCK时则会抛出异常，同时rm则会捕获异常，并将自己的状态转化为standby的状态。
+     *
      * Helper method that creates fencing node, executes the passed operations,
      * and deletes the fencing node.
      */
@@ -1021,6 +1046,7 @@ public class ZKRMStateStore extends RMStateStore {
         new ZKAction<Void>() {
             @Override
             public Void run() throws KeeperException, InterruptedException {
+                // Multiop的操作，相当于transaction，保证多个操作的原子性。
                 zkClient.multi(execOpList);
                 return null;
             }
@@ -1203,8 +1229,8 @@ public class ZKRMStateStore extends RMStateStore {
             while (true) {
                 try {
                     return runWithCheck();
-                } catch (KeeperException.NoAuthException nae) {
-                    if (HAUtil.isHAEnabled(getConfig())) {
+                } catch (KeeperException.NoAuthException nae) { // 处理没有权限异常
+                    if (HAUtil.isHAEnabled(getConfig())) { // 没有权限说明该存储区由于另一个RM成为active被隔离了。即使不是这样，隔离起来也比较保险
                         // NoAuthException possibly means that this store is fenced due to
                         // another RM becoming active. Even if not,
                         // it is safer to assume we have been fenced
@@ -1277,6 +1303,7 @@ public class ZKRMStateStore extends RMStateStore {
     @Unstable
     protected synchronized ZooKeeper getNewZooKeeper()
             throws IOException, InterruptedException {
+        // 创建连接并注册ForwardingWatcher对象
         ZooKeeper zk = new ZooKeeper(zkHostPort, zkSessionTimeout, null);
         zk.register(new ForwardingWatcher(zk));
         return zk;

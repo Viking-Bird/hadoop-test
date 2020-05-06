@@ -72,14 +72,18 @@ public class EmbeddedElectorService extends AbstractService
           " is not set");
     }
 
+    // 读取yarn.resourcemanager.ha.id属性，通常主备机以rm1和rm2命名
     String rmId = HAUtil.getRMHAId(conf);
+    // 读取集群ID属性
     String clusterId = YarnConfiguration.getClusterId(conf);
     localActiveNodeInfo = createActiveNodeInfo(clusterId, rmId);
 
+    // 获取YARN选举地址
     String zkBasePath = conf.get(YarnConfiguration.AUTO_FAILOVER_ZK_BASE_PATH,
         YarnConfiguration.DEFAULT_AUTO_FAILOVER_ZK_BASE_PATH);
     String electionZNode = zkBasePath + "/" + clusterId;
 
+    // ZooKeeper session超时时间
     long zkSessionTimeout = conf.getLong(YarnConfiguration.RM_ZK_TIMEOUT_MS,
         YarnConfiguration.DEFAULT_RM_ZK_TIMEOUT_MS);
 
