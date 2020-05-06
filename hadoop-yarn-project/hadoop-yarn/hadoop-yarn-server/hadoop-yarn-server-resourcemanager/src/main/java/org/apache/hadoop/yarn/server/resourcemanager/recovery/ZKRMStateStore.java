@@ -1021,6 +1021,7 @@ import java.util.List;
             new ZKAction<Void>() {
                 @Override
                 Void run() throws KeeperException, InterruptedException {
+                    // 使当前ZK客户端的连接的ZK节点与Leader节点同步数据
                     zkClient.sync(pathForSync, cb, null);
                     return null;
                 }
