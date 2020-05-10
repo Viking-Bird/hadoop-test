@@ -72,6 +72,8 @@ import org.apache.hadoop.yarn.state.StateMachineFactory;
 @Private
 @Unstable
 /**
+ * 实现ResourceManager状态存储的基类。实现异步通知和与YARN对象交互的接口，
+ * 真正的存储实现需要从它派生并实现阻塞存储和加载方法来实际存储和加载状态。
  * Base class to implement storage of ResourceManager state.
  * Takes care of asynchronous notifications and interfacing with YARN objects.
  * Real store implementations need to derive from it and implement blocking
@@ -137,7 +139,9 @@ public abstract class RMStateStore extends AbstractService {
           .newInstance(appState);
       LOG.info("Storing info for app: " + appId);
       try {
+        // 同步阻塞调用方法存储任务状态
         store.storeApplicationStateInternal(appId, appStateData);
+        // 触发一次应用信息保存事件，由中央调度器进行事件分发处理
         store.notifyApplication(new RMAppEvent(appId,
                RMAppEventType.APP_NEW_SAVED));
       } catch (Exception e) { // 捕获异常，调用notifyStoreOperationFailed方法进行故障转移操作
@@ -259,21 +263,22 @@ public abstract class RMStateStore extends AbstractService {
 
   /**
    * State of an application attempt
+   * 任务尝试状态信息类
    */
   public static class ApplicationAttemptState {
-    final ApplicationAttemptId attemptId;
-    final Container masterContainer;
-    final Credentials appAttemptCredentials;
-    long startTime = 0;
-    long finishTime = 0;
+    final ApplicationAttemptId attemptId; // 任务尝试ID
+    final Container masterContainer; // 所在container的信息
+    final Credentials appAttemptCredentials; // 安全token
+    long startTime = 0; // 开始时间
+    long finishTime = 0; // 结束时间
     // fields set when attempt completes
-    RMAppAttemptState state;
-    String finalTrackingUrl = "N/A";
-    String diagnostics;
-    int exitStatus = ContainerExitStatus.INVALID;
-    FinalApplicationStatus amUnregisteredFinalStatus;
-    long memorySeconds;
-    long vcoreSeconds;
+    RMAppAttemptState state; // 运行状态
+    String finalTrackingUrl = "N/A"; // 任务运行日志查看地址
+    String diagnostics; // 任务异常诊断信息
+    int exitStatus = ContainerExitStatus.INVALID; // 任务退出状态
+    FinalApplicationStatus amUnregisteredFinalStatus; // 任务最终状态
+    long memorySeconds; // 任务消耗的内存总资源
+    long vcoreSeconds; // 任务消耗的CPU总资源
 
     public ApplicationAttemptState(ApplicationAttemptId attemptId,
         Container masterContainer, Credentials appAttemptCredentials,
@@ -342,18 +347,19 @@ public abstract class RMStateStore extends AbstractService {
   
   /**
    * State of an application application
+   * 任务状态信息类
    */
   public static class ApplicationState {
-    final ApplicationSubmissionContext context;
-    final long submitTime;
-    final long startTime;
-    final String user;
+    final ApplicationSubmissionContext context; // 任务描述信息content
+    final long submitTime; // 任务提交时间
+    final long startTime; // 任务开始时间
+    final String user; // 任务提交人
     Map<ApplicationAttemptId, ApplicationAttemptState> attempts =
-                  new HashMap<ApplicationAttemptId, ApplicationAttemptState>();
+                  new HashMap<ApplicationAttemptId, ApplicationAttemptState>(); // 任务重试信息
     // fields set when application completes.
-    RMAppState state;
-    String diagnostics;
-    long finishTime;
+    RMAppState state; // 任务运行状态
+    String diagnostics; // 任务异常诊断信息
+    long finishTime; // 任务完成时间
 
     public ApplicationState(long submitTime,
         long startTime, ApplicationSubmissionContext context, String user) {
@@ -404,15 +410,18 @@ public abstract class RMStateStore extends AbstractService {
     }
   }
 
+  /**
+   * 安全令牌信息
+   */
   public static class RMDTSecretManagerState {
     // DTIdentifier -> renewDate
     Map<RMDelegationTokenIdentifier, Long> delegationTokenState =
-        new HashMap<RMDelegationTokenIdentifier, Long>();
+        new HashMap<RMDelegationTokenIdentifier, Long>(); // 授权令牌状态
 
     Set<DelegationKey> masterKeyState =
-        new HashSet<DelegationKey>();
+        new HashSet<DelegationKey>(); // master key状态
 
-    int dtSequenceNumber = 0;
+    int dtSequenceNumber = 0; // 序列号
 
     public Map<RMDelegationTokenIdentifier, Long> getTokenState() {
       return delegationTokenState;
@@ -429,6 +438,7 @@ public abstract class RMStateStore extends AbstractService {
 
   /**
    * State of the ResourceManager
+   * RM状态信息类
    */
   public static class RMState {
     Map<ApplicationId, ApplicationState> appState =
@@ -571,6 +581,7 @@ public abstract class RMStateStore extends AbstractService {
    * ResourceManager services use this to store the application's state
    * This does not block the dispatcher threads
    * RMAppStoredEvent will be sent on completion to notify the RMApp
+   * 保存应用状态方法，触发一次保存event事件，此方法为非阻塞方法
    */
   @SuppressWarnings("unchecked")
   public synchronized void storeNewApplication(RMApp app) {
@@ -580,6 +591,7 @@ public abstract class RMStateStore extends AbstractService {
     ApplicationState appState =
         new ApplicationState(app.getSubmitTime(), app.getStartTime(), context,
           app.getUser());
+    // 触发一次应用信息保存事件，由中央调度器进行事件分发处理
     dispatcher.getEventHandler().handle(new RMStateStoreAppEvent(appState));
   }
 
@@ -592,6 +604,7 @@ public abstract class RMStateStore extends AbstractService {
    * Blocking API
    * Derived classes must implement this method to store the state of an 
    * application.
+   * 保存应用状态信息的阻塞方法，由子类具体实现
    */
   protected abstract void storeApplicationStateInternal(ApplicationId appId,
       ApplicationStateData appStateData) throws Exception;

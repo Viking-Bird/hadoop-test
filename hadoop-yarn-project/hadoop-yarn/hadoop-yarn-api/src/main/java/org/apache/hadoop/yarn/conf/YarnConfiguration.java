@@ -412,6 +412,11 @@ public class YarnConfiguration extends Configuration {
   public static final String RM_ZK_TIMEOUT_MS = RM_ZK_PREFIX + "timeout-ms";
   public static final int DEFAULT_RM_ZK_TIMEOUT_MS = 10000;
 
+  /** Zookeeper znode limit */
+  public static final String RM_ZK_ZNODE_SIZE_LIMIT_BYTES =
+          RM_ZK_PREFIX + "max-znode-size.bytes";
+  public static final int DEFAULT_RM_ZK_ZNODE_SIZE_LIMIT_BYTES = 1024 * 1024;
+
   public static final String RM_ZK_ACL = RM_ZK_PREFIX + "acl";
   public static final String DEFAULT_RM_ZK_ACL = "world:anyone:rwcda";
 

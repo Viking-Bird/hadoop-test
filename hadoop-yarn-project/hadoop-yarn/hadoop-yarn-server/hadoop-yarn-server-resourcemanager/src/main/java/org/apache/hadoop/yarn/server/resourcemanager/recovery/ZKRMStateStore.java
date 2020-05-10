@@ -89,6 +89,7 @@ import java.util.List;
 
     private String zkHostPort = null;
     private int zkSessionTimeout;
+    private int zknodeLimit; // 保存ZNode节点数据量限制
 
     @VisibleForTesting
     long zkRetryInterval;
@@ -229,6 +230,9 @@ import java.util.List;
         zkSessionTimeout =
                 conf.getInt(YarnConfiguration.RM_ZK_TIMEOUT_MS,
                         YarnConfiguration.DEFAULT_RM_ZK_TIMEOUT_MS); // ZK session超时时间，以毫秒为单位
+        // 获取yarn-site.xml中yarn.resourcemanager.zk-max-znode-size.bytes的值
+        zknodeLimit = conf.getInt(YarnConfiguration.RM_ZK_ZNODE_SIZE_LIMIT_BYTES,
+                YarnConfiguration.DEFAULT_RM_ZK_ZNODE_SIZE_LIMIT_BYTES);
 
         // 计算重试连接ZK的时间间隔，以毫秒表示
         if (HAUtil.isHAEnabled(conf)) { // 高可用情况下是：重试时间间隔=session超时时间/重试ZK的次数
@@ -663,8 +667,16 @@ import java.util.List;
         }
         // 创建任务节点并存储任务数据
         byte[] appStateData = appStateDataPB.getProto().toByteArray();
-        createWithRetries(nodeCreatePath, appStateData, zkAcl,
-                CreateMode.PERSISTENT);
+        ApplicationState appState = getAppStateData(appStateDataPB);
+        if (appStateData.length <= zknodeLimit) {
+            createWithRetries(nodeCreatePath, appStateData, zkAcl,
+                    CreateMode.PERSISTENT);
+            LOG.info("Application store data size for " + nodeCreatePath + " is "
+                    + appStateData.length + ". The maximum allowed " + zknodeLimit + " size. ApplicationState info: " + appState.toString() + ". See yarn.resourcemanager.zk-max-znode-size.bytes.");
+        } else {
+            LOG.info("Application store data size for " + nodeCreatePath + " is "
+                    + appStateData.length + ". Exceed the maximum allowed " + zknodeLimit + " size. ApplicationState info: " + appState.toString() + ". See yarn.resourcemanager.zk-max-znode-size.bytes.");
+        }
 
     }
 
@@ -687,16 +699,34 @@ import java.util.List;
 
         // Application状态字节数组
         byte[] appStateData = appStateDataPB.getProto().toByteArray();
-
-        // 判断任务节点存在不存在，存在就更新数据，不存在就创建节点，并注册watch
-        if (existsWithRetries(nodeUpdatePath, true) != null) {
-            setDataWithRetries(nodeUpdatePath, appStateData, -1);
+        ApplicationState appState = getAppStateData(appStateDataPB);
+        if (appStateData.length <= zknodeLimit) {
+            // 判断任务节点存在不存在，存在就更新数据，不存在就创建节点，并注册watch
+            if (existsWithRetries(nodeUpdatePath, true) != null) {
+                setDataWithRetries(nodeUpdatePath, appStateData, -1);
+            } else {
+                createWithRetries(nodeUpdatePath, appStateData, zkAcl,
+                        CreateMode.PERSISTENT);
+                LOG.debug(appId + " znode didn't exist. Created a new znode to"
+                        + " update the application state.");
+            }
+            LOG.info("Application update data size for " + nodeUpdatePath + " is "
+                    + appStateData.length + ". The maximum allowed " + zknodeLimit + " size. ApplicationState info: " + appState.toString() + ". See yarn.resourcemanager.zk-max-znode-size.bytes.");
         } else {
-            createWithRetries(nodeUpdatePath, appStateData, zkAcl,
-                    CreateMode.PERSISTENT);
-            LOG.debug(appId + " znode didn't exist. Created a new znode to"
-                    + " update the application state.");
+            LOG.info("Application update data size for " + nodeUpdatePath + " is "
+                    + appStateData.length + ". Exceed the maximum allowed " + zknodeLimit + " size. ApplicationState info: " + appState.toString() + ". See yarn.resourcemanager.zk-max-znode-size.bytes.");
         }
+    }
+
+    private ApplicationState getAppStateData(ApplicationStateData appStateDataPB) {
+        ApplicationState appState =
+                new ApplicationState(appStateDataPB.getSubmitTime(),
+                        appStateDataPB.getStartTime(),
+                        appStateDataPB.getApplicationSubmissionContext(),
+                        appStateDataPB.getUser(),
+                        appStateDataPB.getState(),
+                        appStateDataPB.getDiagnostics(), appStateDataPB.getFinishTime());
+        return appState;
     }
 
     /**
@@ -719,10 +749,19 @@ import java.util.List;
             LOG.debug("Storing info for attempt: " + appAttemptId + " at: "
                     + nodeCreatePath);
         }
+
         // 创建任务节点并存储任务重试数据
         byte[] attemptStateData = attemptStateDataPB.getProto().toByteArray();
-        createWithRetries(nodeCreatePath, attemptStateData, zkAcl,
-                CreateMode.PERSISTENT);
+        ApplicationAttemptState attemptState = getApplicationAttemptState(appAttemptId, attemptStateDataPB);
+        if (attemptStateData.length <= zknodeLimit) {
+            createWithRetries(nodeCreatePath, attemptStateData, zkAcl,
+                    CreateMode.PERSISTENT);
+            LOG.info("Application store attemptState data size for " + nodeCreatePath + " is "
+                    + attemptStateData.length + ". The maximum allowed " + zknodeLimit + " size. ApplicationAttemptState info: " + attemptState.toString() + ". See yarn.resourcemanager.zk-max-znode-size.bytes.");
+        } else {
+            LOG.info("Application update attemptState data size for " + nodeCreatePath + " is "
+                    + attemptStateData.length + ". Exceed the maximum allowed " + zknodeLimit + " size. ApplicationAttemptState info: " + attemptState.toString() + ". See yarn.resourcemanager.zk-max-znode-size.bytes.");
+        }
     }
 
     /**
@@ -748,16 +787,45 @@ import java.util.List;
         byte[] attemptStateData = attemptStateDataPB.getProto().toByteArray();
 
         // 更新任务重试数据，并注册watch
-        if (existsWithRetries(nodeUpdatePath, true) != null) {
-            setDataWithRetries(nodeUpdatePath, attemptStateData, -1);
+        ApplicationAttemptState attemptState = getApplicationAttemptState(appAttemptId, attemptStateDataPB);
+        // 判断要写入的任务尝试数据信息是否超过zknodeLimit变量的值，如果没有，就执行任务尝试数据更新操作。否则，只打印info信息，不执行任务尝试数据更新操作
+        if (attemptStateData.length <= zknodeLimit) {
+            if (existsWithRetries(nodeUpdatePath, true) != null) {
+                setDataWithRetries(nodeUpdatePath, attemptStateData, -1);
+            } else {
+                createWithRetries(nodeUpdatePath, attemptStateData, zkAcl,
+                        CreateMode.PERSISTENT);
+                LOG.debug(appAttemptId + " znode didn't exist. Created a new znode to"
+                        + " update the application attempt state.");
+            }
+            LOG.info("Application update attemptState data size for " + nodeUpdatePath + " is "
+                    + attemptStateData.length + ". The maximum allowed " + zknodeLimit + " size. ApplicationAttemptState info: " + attemptState.toString() + ". See yarn.resourcemanager.zk-max-znode-size.bytes.");
         } else {
-            createWithRetries(nodeUpdatePath, attemptStateData, zkAcl,
-                    CreateMode.PERSISTENT);
-            LOG.debug(appAttemptId + " znode didn't exist. Created a new znode to"
-                    + " update the application attempt state.");
+            LOG.info("Application update attemptState data size for " + nodeUpdatePath + " is "
+                    + attemptStateData.length + ". Exceed the maximum allowed " + zknodeLimit + " size. ApplicationAttemptState info: " + attemptState.toString() + ". See yarn.resourcemanager.zk-max-znode-size.bytes.");
         }
     }
 
+    private ApplicationAttemptState getApplicationAttemptState(ApplicationAttemptId appAttemptId, ApplicationAttemptStateData attemptStateDataPB) throws IOException {
+        Credentials credentials = null;
+        if (attemptStateDataPB.getAppAttemptTokens() != null) {
+            credentials = new Credentials();
+            DataInputByteBuffer dibb = new DataInputByteBuffer();
+            dibb.reset(attemptStateDataPB.getAppAttemptTokens());
+            credentials.readTokenStorageStream(dibb);
+        }
+
+        return new ApplicationAttemptState(appAttemptId,
+                attemptStateDataPB.getMasterContainer(), credentials,
+                attemptStateDataPB.getStartTime(), attemptStateDataPB.getState(),
+                attemptStateDataPB.getFinalTrackingUrl(),
+                attemptStateDataPB.getDiagnostics(),
+                attemptStateDataPB.getFinalApplicationStatus(),
+                attemptStateDataPB.getAMContainerExitStatus(),
+                attemptStateDataPB.getFinishTime(),
+                attemptStateDataPB.getMemorySeconds(),
+                attemptStateDataPB.getVcoreSeconds());
+    }
 
     /**
      * 删除application状态信息
