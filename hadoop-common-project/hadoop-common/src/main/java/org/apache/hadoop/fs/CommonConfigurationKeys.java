@@ -88,6 +88,7 @@ public class CommonConfigurationKeys extends CommonConfigurationKeysPublic {
    * IPC_CALLQUEUE_NAMESPACE + ".8020." + IPC_CALLQUEUE_IMPL_KEY
    */
   public static final String IPC_CALLQUEUE_NAMESPACE = "ipc";
+  // 完整配置为：ipc.8020.callqueue.impl
   public static final String IPC_CALLQUEUE_IMPL_KEY = "callqueue.impl";
   public static final String IPC_CALLQUEUE_IDENTITY_PROVIDER_KEY = "identity-provider.impl";
 

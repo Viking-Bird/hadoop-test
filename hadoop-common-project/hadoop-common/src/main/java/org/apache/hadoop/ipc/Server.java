@@ -552,6 +552,11 @@ public abstract class Server {
   }
 
   /** Listens on the socket. Creates jobs for the handler threads*/
+  /**
+   * 整个 Server 只有一个 Listener 线程，Listener 对象中的 Selector 对象 acceptorSelector 负责监听来自客户端的 Socket 连接请求。
+   * acceptorSelector 在ServerSocketChannel 上注册 OP_ACCEPT 事件，等待客户端 Client.call() 中的 getConnection 触发该事件唤醒 Listener 线程，
+   * 创建新的 SocketChannel 并创建 readers 线程池；Listener 会在 reader 线程池中选取一个线程，并在 Reader 的 readerSelector 上注册 OP_READ 事件。
+   */
   private class Listener extends Thread {
     
     private ServerSocketChannel acceptChannel = null; //the accept channel
@@ -587,7 +592,10 @@ public abstract class Server {
       this.setName("IPC Server listener on " + port);
       this.setDaemon(true);
     }
-    
+
+    /**
+     * 读取channel里的数据
+     */
     private class Reader extends Thread {
       final private BlockingQueue<Connection> pendingConnections;
       private final Selector readSelector;
@@ -760,6 +768,7 @@ public abstract class Server {
       c.setLastContact(Time.now());
       
       try {
+        // 读取数据，放入共享队列
         count = c.readAndProcess();
       } catch (InterruptedException ieo) {
         LOG.info(Thread.currentThread().getName() + ": readAndProcess caught InterruptedException", ieo);
@@ -1990,6 +1999,9 @@ public abstract class Server {
   }
 
   /** Handles queued calls . */
+  /**
+   * 处理队列里面的请求
+   */
   private class Handler extends Thread {
     public Handler(int instanceNumber) {
       this.setDaemon(true);
