@@ -53,6 +53,7 @@ import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.Time;
 
 /**
+ * 管理指定块池目录的所有数据块
  * A block pool slice represents a portion of a block pool stored on a volume.  
  * Taken together, all BlockPoolSlices sharing a block pool ID across a 
  * cluster represent a single block pool.
@@ -62,20 +63,25 @@ import org.apache.hadoop.util.Time;
 class BlockPoolSlice {
   static final Log LOG = LogFactory.getLog(BlockPoolSlice.class);
 
-  private final String bpid;
+  private final String bpid; // 块池ID
   private final FsVolumeImpl volume; // volume to which this BlockPool belongs to
+  /**
+   * 不同状态块的子目录字段
+   */
   private final File currentDir; // StorageDirectory/current/bpid/current
   // directory where finalized replicas are stored
   private final File finalizedDir;
   private final File lazypersistDir;
   private final File rbwDir; // directory store RBW replica
   private final File tmpDir; // directory store Temporary replica
+
   private static final String DU_CACHE_FILE = "dfsUsed";
   private volatile boolean dfsUsedSaved = false;
   private static final int SHUTDOWN_HOOK_PRIORITY = 30;
   private final boolean deleteDuplicateReplicas;
   
   // TODO:FEDERATION scalability issue - a thread per DU is needed
+  // 描述当前块的磁盘使用情况
   private final DU dfsUsage;
 
   /**
@@ -90,6 +96,9 @@ class BlockPoolSlice {
       Configuration conf) throws IOException {
     this.bpid = bpid;
     this.volume = volume;
+    /**
+     * 创建各种目录
+     */
     this.currentDir = new File(bpDir, DataStorage.STORAGE_DIR_CURRENT); 
     this.finalizedDir = new File(
         currentDir, DataStorage.STORAGE_DIR_FINALIZED);
@@ -136,6 +145,7 @@ class BlockPoolSlice {
     this.dfsUsage.start();
 
     // Make the dfs usage to be saved during shutdown.
+    // 关闭勾子，DataNode进程结束时保存磁盘使用情况
     ShutdownHookManager.get().addShutdownHook(
       new Runnable() {
         @Override
@@ -267,6 +277,13 @@ class BlockPoolSlice {
     return DatanodeUtil.createTmpFile(b, f);
   }
 
+  /**
+   * 创建Finalized状态的副本
+   * @param b
+   * @param f
+   * @return
+   * @throws IOException
+   */
   File addBlock(Block b, File f) throws IOException {
     File blockDir = DatanodeUtil.idToBlockDir(finalizedDir, b.getBlockId());
     if (!blockDir.exists()) {
@@ -274,8 +291,10 @@ class BlockPoolSlice {
         throw new IOException("Failed to mkdirs " + blockDir);
       }
     }
+    // 创建数据块副本文件和校验文件
     File blockFile = FsDatasetImpl.moveBlockFiles(b, f, blockDir);
     File metaFile = FsDatasetUtil.getMetaFile(blockFile, b.getGenerationStamp());
+    // 更新磁盘使用
     dfsUsage.incDfsUsed(b.getNumBytes()+metaFile.length());
     return blockFile;
   }

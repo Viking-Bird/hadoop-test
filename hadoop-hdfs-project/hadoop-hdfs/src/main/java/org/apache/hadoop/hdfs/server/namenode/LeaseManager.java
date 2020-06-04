@@ -72,20 +72,24 @@ public class LeaseManager {
 
   private final FSNamesystem fsnamesystem;
 
+  // 软限制用于记录写文件规定的租约超时时间
   private long softLimit = HdfsConstants.LEASE_SOFTLIMIT_PERIOD;
+  // 硬限制用于判断文件是否由于异常未能正确关闭
   private long hardLimit = HdfsConstants.LEASE_HARDLIMIT_PERIOD;
 
   //
   // Used for handling lock-leases
   // Mapping: leaseHolder -> Lease
+  // 保存租约持有者与租约的对应关系
   //
   private final SortedMap<String, Lease> leases = new TreeMap<String, Lease>();
-  // Set of: Lease
+  // Set of: Lease 以租约更新时间为序保存所有租约，如果更新时间相同，则按照租约持有者的字典序保存
   private final NavigableSet<Lease> sortedLeases = new TreeSet<Lease>();
 
   // 
   // Map path names to leases. It is protected by the sortedLeases lock.
   // The map stores pathnames in lexicographical order.
+  // 保存文件路径与租约的对应关系，以路径的字典序为顺序保存
   //
   private final SortedMap<String, Lease> sortedLeasesByPath = new TreeMap<String, Lease>();
 
@@ -154,6 +158,7 @@ public class LeaseManager {
   
   /**
    * Adds (or re-adds) the lease for the specified file.
+   * 添加租约
    */
   synchronized Lease addLease(String holder, String src) {
     Lease lease = getLease(holder);
@@ -249,26 +254,35 @@ public class LeaseManager {
    * expire, all the corresponding locks can be released.
    *************************************************************/
   class Lease implements Comparable<Lease> {
-    private final String holder;
-    private long lastUpdate;
-    private final Collection<String> paths = new TreeSet<String>();
+    private final String holder; // 保存租约持有者信息
+    private long lastUpdate; // 租约最后更新时间
+    private final Collection<String> paths = new TreeSet<String>(); // 保存该客户端打开的所有HDFS文件路径
   
     /** Only LeaseManager object can create a lease */
     private Lease(String holder) {
       this.holder = holder;
       renew();
     }
-    /** Only LeaseManager object can renew a lease */
+    /**
+     * 更新客户端最近更新时间
+     * Only LeaseManager object can renew a lease
+     */
     private void renew() {
       this.lastUpdate = now();
     }
 
-    /** @return true if the Hard Limit Timer has expired */
+    /**
+     * 判读当前租约是否超出了硬限制
+     * @return true if the Hard Limit Timer has expired
+     */
     public boolean expiredHardLimit() {
       return now() - lastUpdate > hardLimit;
     }
 
-    /** @return true if the Soft Limit Timer has expired */
+    /**
+     * 判读当前租约是否超出了软限制
+     * @return true if the Soft Limit Timer has expired
+     */
     public boolean expiredSoftLimit() {
       return now() - lastUpdate > softLimit;
     }
@@ -403,13 +417,17 @@ public class LeaseManager {
   }
   
   /******************************************************
+   * 租约检查线程，每隔两秒检查租约
    * Monitor checks for leases that have expired,
    * and disposes of them.
    ******************************************************/
   class Monitor implements Runnable {
     final String name = getClass().getSimpleName();
 
-    /** Check leases periodically. */
+    /**
+     * 每2秒检查租约是否过期
+     * Check leases periodically.
+     */
     @Override
     public void run() {
       for(; shouldRunMonitor && fsnamesystem.isRunning(); ) {
@@ -427,7 +445,7 @@ public class LeaseManager {
               fsnamesystem.getEditLog().logSync();
             }
           }
-  
+
           Thread.sleep(HdfsServerConstants.NAMENODE_LEASE_RECHECK_INTERVAL);
         } catch(InterruptedException ie) {
           if (LOG.isDebugEnabled()) {
@@ -461,7 +479,8 @@ public class LeaseManager {
     return inodes;
   }
   
-  /** Check the leases beginning from the oldest.
+  /**
+   * Check the leases beginning from the oldest.
    *  @return true is sync is needed.
    */
   @VisibleForTesting
@@ -489,6 +508,7 @@ public class LeaseManager {
       leaseToCheck.getPaths().toArray(leasePaths);
       for(String p : leasePaths) {
         try {
+          // 进行租约恢复
           boolean completed = fsnamesystem.internalReleaseLease(leaseToCheck, p,
               HdfsServerConstants.NAMENODE_LEASE_HOLDER);
           if (LOG.isDebugEnabled()) {

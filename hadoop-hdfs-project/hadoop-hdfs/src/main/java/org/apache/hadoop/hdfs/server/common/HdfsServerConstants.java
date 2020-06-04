@@ -238,16 +238,17 @@ public final class HdfsServerConstants {
    * Block replica states, which it can go through while being constructed.
    */
   static public enum ReplicaState {
+    // DataNode将这些状态的副本存储在不同的目录下
     /** Replica is finalized. The state when replica is not modified. */
-    FINALIZED(0),
+    FINALIZED(0), // 完成写操作的副本
     /** Replica is being written to. */
-    RBW(1),
+    RBW(1), // 正在进行写或者追加操作的副本
     /** Replica is waiting to be recovered. */
-    RWR(2),
+    RWR(2), // 等待块恢复操作的副本
     /** Replica is under recovery. */
-    RUR(3),
+    RUR(3), // 进行块恢复时的副本
     /** Temporary replica: created for replication and relocation only. */
-    TEMPORARY(4);
+    TEMPORARY(4); // DataNode间复制数据块，或者进行集群数据块平衡操作时，正在写入的副本，这个副本对于客户端是不可见的，DataNode重启时会删除这些副本
 
     private final int value;
 

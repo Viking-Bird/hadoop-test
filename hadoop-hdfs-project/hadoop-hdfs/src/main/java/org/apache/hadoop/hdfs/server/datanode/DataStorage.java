@@ -75,7 +75,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-/** 
+/**
+ * 负责管理与组织磁盘上存储的HDFS数据块
  * Data storage information file.
  * <p>
  * @see Storage

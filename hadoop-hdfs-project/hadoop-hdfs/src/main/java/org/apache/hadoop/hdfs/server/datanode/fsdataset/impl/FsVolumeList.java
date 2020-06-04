@@ -34,11 +34,19 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.VolumeChoosingPolicy;
 import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import org.apache.hadoop.util.Time;
 
+/**
+ * DataNode存储目录集合
+ */
 class FsVolumeList {
   private final AtomicReference<FsVolumeImpl[]> volumes =
       new AtomicReference<FsVolumeImpl[]>(new FsVolumeImpl[0]);
   private Object checkDirsMutex = new Object();
 
+  /**
+   * 副本存储目录选择方式：
+   * 1、最多可用空间
+   * 2、轮询策略
+   */
   private final VolumeChoosingPolicy<FsVolumeImpl> blockChooser;
   private volatile int numFailedVolumes;
 
@@ -300,6 +308,7 @@ class FsVolumeList {
     
     final List<IOException> exceptions = Collections.synchronizedList(
         new ArrayList<IOException>());
+    // 给FsVolumeImpl启动一个个线程添加副本
     List<Thread> blockPoolAddingThreads = new ArrayList<Thread>();
     for (final FsVolumeImpl v : volumes.get()) {
       Thread t = new Thread() {

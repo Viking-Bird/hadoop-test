@@ -36,6 +36,9 @@ import org.apache.hadoop.util.Daemon;
 import com.google.common.base.Preconditions;
 
 /**
+ * HealthMonitor 主要负责检测 NameNode 的健康状态，
+ * 如果检测到 NameNode 的状态发生变化，会回调 ZKFailoverController 的相应方法进行自动的主备选举。
+ *
  * This class is a daemon which runs in a loop, periodically heartbeating
  * with an HA service. It is responsible for keeping track of that service's
  * health and exposing callbacks to the failover controller when the health

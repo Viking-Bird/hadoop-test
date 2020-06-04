@@ -47,6 +47,7 @@ import org.apache.hadoop.util.DiskChecker.DiskErrorException;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 
 /**
+ * 管理单个存储目录下的数据块
  * The underlying volume used to store replica.
  * 
  * It uses the {@link FsDatasetImpl} object for synchronization.
@@ -58,7 +59,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
   private final String storageID;
   private final StorageType storageType;
   private final Map<String, BlockPoolSlice> bpSlices
-      = new ConcurrentHashMap<String, BlockPoolSlice>();
+      = new ConcurrentHashMap<String, BlockPoolSlice>(); // 管理块池ID到块池对象的映射
   private final File currentDir;    // <StorageDirectory>/current
   private final DF usage;           
   private final long reserved;
@@ -72,6 +73,7 @@ public class FsVolumeImpl implements FsVolumeSpi {
   protected volatile long configuredCapacity;
 
   /**
+   * 用于处理添加到缓存中的新数据块的线程池
    * Per-volume worker pool that processes new blocks to cache.
    * The maximum number of workers per volume is bounded (configurable via
    * dfs.datanode.fsdatasetcache.max.threads.per.volume) to limit resource

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdfs.qjournal.client;
 
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeoutException;
 
 import org.apache.hadoop.ipc.RemoteException;

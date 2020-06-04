@@ -59,8 +59,8 @@ public class HdfsConstants {
   //
   // Timeouts, constants
   //
-  public static final long LEASE_SOFTLIMIT_PERIOD = 60 * 1000;
-  public static final long LEASE_HARDLIMIT_PERIOD = 60 * LEASE_SOFTLIMIT_PERIOD;
+  public static final long LEASE_SOFTLIMIT_PERIOD = 60 * 1000; // 软限制一分钟
+  public static final long LEASE_HARDLIMIT_PERIOD = 60 * LEASE_SOFTLIMIT_PERIOD; // 硬限制一小时
   public static final long LEASE_RECOVER_PERIOD = 10 * 1000; // in ms
 
   // We need to limit the length and depth of a path in the filesystem.

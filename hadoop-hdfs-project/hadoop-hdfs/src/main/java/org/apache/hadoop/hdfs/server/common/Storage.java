@@ -252,6 +252,7 @@ public abstract class Storage extends StorageInfo {
   }
   
   /**
+   * 定义管理存储的目录的通用方法
    * One of the storage directories.
    */
   @InterfaceAudience.Private
@@ -261,6 +262,7 @@ public abstract class Storage extends StorageInfo {
     // between multiple block pools in the case of federation.
     final boolean isShared;
     final StorageDirType dirType; // storage dir type
+    // 用来支持NameNode或者DataNode线程独占存储目录的操作
     FileLock lock;                // storage lock
 
     private String storageUuid = null;      // Storage directory identifier.
@@ -455,6 +457,7 @@ public abstract class Storage extends StorageInfo {
     }
 
     /**
+     * 用于在DataNode启动时分析当前DataNode存储目录的状态
      * Check consistency of the storage directory
      * 
      * @param startOpt a startup option.
@@ -573,6 +576,7 @@ public abstract class Storage extends StorageInfo {
     }
 
     /**
+     * 恢复存储空间状态
      * Complete or recover storage state from previously failed transition.
      * 
      * @param curState specifies what/how the state should be recovered
@@ -698,8 +702,9 @@ public abstract class Storage extends StorageInfo {
     @SuppressWarnings("resource")
     FileLock tryLock() throws IOException {
       boolean deletionHookAdded = false;
+      // 构造in_use.lock锁文件
       File lockF = new File(root, STORAGE_FILE_LOCK);
-      if (!lockF.exists()) {
+      if (!lockF.exists()) { // 锁文件构造失败，则退出执行
         lockF.deleteOnExit();
         deletionHookAdded = true;
       }
@@ -707,13 +712,17 @@ public abstract class Storage extends StorageInfo {
       String jvmName = ManagementFactory.getRuntimeMXBean().getName();
       FileLock res = null;
       try {
+        // 尝试在锁文件上加锁
         res = file.getChannel().tryLock();
+        // 已经有程序获得了锁，那么直接抛出异常
         if (null == res) {
           throw new OverlappingFileLockException();
         }
+        // 加锁成功，在锁文件中写入虚拟机信息
         file.write(jvmName.getBytes(Charsets.UTF_8));
         LOG.info("Lock on " + lockF + " acquired by nodename " + jvmName);
       } catch(OverlappingFileLockException oe) {
+        // 已经有程序获得了锁，则关闭锁文件，返回null
         // Cannot read from the locked file on Windows.
         String lockingJvmName = Path.WINDOWS ? "" : (" " + file.readLine());
         LOG.error("It appears that another namenode" + lockingJvmName
@@ -721,6 +730,7 @@ public abstract class Storage extends StorageInfo {
         file.close();
         return null;
       } catch(IOException e) {
+        // 读取锁文件失败，则关闭锁文件，抛出异常
         LOG.error("Failed to acquire lock on " + lockF + ". If this storage directory is mounted via NFS, " 
             + "ensure that the appropriate nfs lock services are running.", e);
         file.close();
@@ -730,6 +740,7 @@ public abstract class Storage extends StorageInfo {
         // If the file existed prior to our startup, we didn't
         // call deleteOnExit above. But since we successfully locked
         // the dir, we can take care of cleaning it up.
+        // 加锁成功，在虚拟机运行结束后，删除锁文件
         lockF.deleteOnExit();
       }
       return res;
@@ -737,6 +748,7 @@ public abstract class Storage extends StorageInfo {
 
     /**
      * Unlock storage.
+     * 释放锁，关闭channel
      * 
      * @throws IOException
      */

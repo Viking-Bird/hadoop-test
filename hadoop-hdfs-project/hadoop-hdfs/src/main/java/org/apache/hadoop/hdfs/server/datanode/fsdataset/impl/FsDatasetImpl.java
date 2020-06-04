@@ -112,7 +112,7 @@ import org.apache.hadoop.util.Time;
 /**************************************************
  * FSDataset manages a set of data blocks.  Each block
  * has a unique name and an extent on disk.
- *
+ * 管理DataNode上所有的数据块
  ***************************************************/
 @InterfaceAudience.Private
 class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
@@ -177,6 +177,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
 
 
   /**
+   *
    * This should be primarily used for testing.
    * @return clone of replica store in datanode memory
    */
@@ -225,6 +226,7 @@ class FsDatasetImpl implements FsDatasetSpi<FsVolumeImpl> {
   private final int validVolsRequired;
   private volatile boolean fsRunning;
 
+  // 保存副本状态
   final ReplicaMap volumeMap;
   final RamDiskReplicaTracker ramDiskReplicaTracker;
   final RamDiskAsyncLazyPersistService asyncLazyPersistService;

@@ -49,7 +49,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 
 /**
- * 
+ * ActiveStandbyElector 主要负责完成自动的主备选举，内部封装了 Zookeeper 的处理逻辑，
+ * 一旦 Zookeeper 主备选举完成，会回调 ZKFailoverController 的相应方法来进行 NameNode 的主备状态切换。
+ *
  * This class implements a simple library to perform leader election on top of
  * Apache Zookeeper. Using Zookeeper as a coordination service, leader election
  * can be performed by atomically creating an ephemeral lock file (znode) on
@@ -136,8 +138,10 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
    * Name of the lock znode used by the library. Protected for access in test
    * classes
    */
+  // 用于主备选举的临时节点
   @VisibleForTesting
   protected static final String LOCK_FILENAME = "ActiveStandbyElectorLock";
+  // 用于进行发生故障的active节点进行隔离的持久节点
   @VisibleForTesting
   protected static final String BREADCRUMB_FILENAME = "ActiveBreadCrumb";
 
@@ -228,6 +232,8 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
   }
 
   /**
+   * 发起主备选举
+   *
    * To participate in election, the app will call joinElection. The result will
    * be notified by a callback on either the becomeActive or becomeStandby app
    * interfaces. <br/>
@@ -339,6 +345,7 @@ public class ActiveStandbyElector implements StatCallback, StringCallback {
 
 
   /**
+   * 删除当前已经在 Zookeeper 上建立的临时节点退出主备选举，这样其它的 NameNode 就有机会成为主 NameNode
    * Any service instance can drop out of the election by calling quitElection. 
    * <br/>
    * This will lose any leader status, if held, and stop monitoring of the lock

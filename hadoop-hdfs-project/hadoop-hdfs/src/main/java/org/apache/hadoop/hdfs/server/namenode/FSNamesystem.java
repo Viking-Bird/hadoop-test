@@ -3583,19 +3583,29 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     return true;
   }
 
+  /**
+   * 检查租约
+   * @param src
+   * @param holder
+   * @param inode
+   * @param fileId
+   * @return
+   * @throws LeaseExpiredException
+   * @throws FileNotFoundException
+   */
   private INodeFile checkLease(String src, String holder, INode inode,
                                long fileId)
       throws LeaseExpiredException, FileNotFoundException {
     assert hasReadLock();
     final String ident = src + " (inode " + fileId + ")";
-    if (inode == null) {
+    if (inode == null) { //HDFS文件不存在，则抛出异常
       Lease lease = leaseManager.getLease(holder);
       throw new LeaseExpiredException(
           "No lease on " + ident + ": File does not exist. "
           + (lease != null ? lease.toString()
               : "Holder " + holder + " does not have any open files."));
     }
-    if (!inode.isFile()) {
+    if (!inode.isFile()) { //INode是一个目录，则抛出异常
       Lease lease = leaseManager.getLease(holder);
       throw new LeaseExpiredException(
           "No lease on " + ident + ": INode is not a regular file. "
@@ -3603,7 +3613,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
               : "Holder " + holder + " does not have any open files."));
     }
     final INodeFile file = inode.asFile();
-    if (!file.isUnderConstruction()) {
+    if (!file.isUnderConstruction()) {// 文件不处于构建中状态，则抛出异常
       Lease lease = leaseManager.getLease(holder);
       throw new LeaseExpiredException(
           "No lease on " + ident + ": File is not open for writing. "
@@ -3613,9 +3623,11 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     // No further modification is allowed on a deleted file.
     // A file is considered deleted, if it is not in the inodeMap or is marked
     // as deleted in the snapshot feature.
-    if (isFileDeleted(file)) {
+    if (isFileDeleted(file)) { // 文件已经被删除，则抛出异常
       throw new FileNotFoundException(src);
     }
+
+    // 租约信息不匹配，则抛出异常
     String clientName = file.getFileUnderConstructionFeature().getClientName();
     if (holder != null && !clientName.equals(holder)) {
       throw new LeaseExpiredException("Lease mismatch on " + ident +
@@ -4551,6 +4563,8 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
   }
 
   /**
+   * 用于将一个打开的文件进行租约恢复并关闭
+   *
    * Move a file that is being written to be immutable.
    * @param src The filename
    * @param lease The lease for the client creating the file
@@ -4573,7 +4587,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
 
     final INodesInPath iip = dir.getLastINodeInPath(src);
     final INodeFile pendingFile = iip.getINode(0).asFile();
-    int nrBlocks = pendingFile.numBlocks();
+    int nrBlocks = pendingFile.numBlocks(); // 文件拥有的数据块数量
     BlockInfo[] blocks = pendingFile.getBlocks();
 
     int nrCompleteBlocks;
@@ -4588,6 +4602,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
 
     // If there are no incomplete blocks associated with this file,
     // then reap lease immediately and close the file.
+    // 如果文件拥有的所有数据块都处于COMPLETE状态，则可以直接关闭文件，释放租约
     if(nrCompleteBlocks == nrBlocks) {
       finalizeINodeFileUnderConstruction(src, pendingFile,
           iip.getLatestSnapshotId());
