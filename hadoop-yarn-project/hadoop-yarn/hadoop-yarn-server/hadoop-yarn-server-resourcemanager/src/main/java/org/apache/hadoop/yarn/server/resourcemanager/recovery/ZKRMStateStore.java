@@ -573,6 +573,7 @@ import java.util.List;
 
     private synchronized void loadRMAppState(RMState rmState) throws Exception {
         // 当/rmstore/ZKRMStateRoot/RMAppRoot/节点及其子节点被删除或创建时，watch被触发
+        // 给/rmstore/ZKRMStateRoot/RMAppRoot/子节点注册watch
         List<String> childNodes = getChildrenWithRetries(rmAppRoot, true);
         for (String childNodeName : childNodes) {
             String childNodePath = getNodePath(rmAppRoot, childNodeName);
@@ -616,6 +617,7 @@ import java.util.List;
         for (String attemptIDStr : attempts) {
             if (attemptIDStr.startsWith(ApplicationAttemptId.appAttemptIdStrPrefix)) {
                 String attemptPath = getNodePath(appPath, attemptIDStr);
+                // 获取任务重试数据并注册watch
                 byte[] attemptData = getDataWithRetries(attemptPath, true);
 
                 ApplicationAttemptId attemptId =
