@@ -296,6 +296,7 @@ public class AdminService extends CompositeService implements
     UserGroupInformation user = checkAccess("transitionToActive");
     checkHaStateChange(reqInfo);
     try {
+      // 通知RM转为Active状态
       rm.transitionToActive();
       // call all refresh*s for active RM to get the updated configurations.
       refreshAll();

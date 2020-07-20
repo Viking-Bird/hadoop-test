@@ -65,6 +65,7 @@ public class EmbeddedElectorService extends AbstractService
       throws Exception {
     conf = conf instanceof YarnConfiguration ? conf : new YarnConfiguration(conf);
 
+    // 读取ZK集群地址
     String zkQuorum = conf.get(YarnConfiguration.RM_ZK_ADDRESS);
     if (zkQuorum == null) {
      throw new YarnRuntimeException("Embedded automatic failover " +
@@ -74,13 +75,14 @@ public class EmbeddedElectorService extends AbstractService
 
     // 读取yarn.resourcemanager.ha.id属性，通常主备机以rm1和rm2命名
     String rmId = HAUtil.getRMHAId(conf);
-    // 读取集群ID属性
+    // 读取集群ID属性，也就是yarn.resourcemanager.cluster-id的值
     String clusterId = YarnConfiguration.getClusterId(conf);
     localActiveNodeInfo = createActiveNodeInfo(clusterId, rmId);
 
-    // 获取YARN选举地址
+    // 设置YARN选举的父ZNode，默认值是/yarn-leader-election
     String zkBasePath = conf.get(YarnConfiguration.AUTO_FAILOVER_ZK_BASE_PATH,
         YarnConfiguration.DEFAULT_AUTO_FAILOVER_ZK_BASE_PATH);
+    // 设置选举的地址：/yarn-leader-election+clusterId
     String electionZNode = zkBasePath + "/" + clusterId;
 
     // ZooKeeper session超时时间
@@ -90,9 +92,11 @@ public class EmbeddedElectorService extends AbstractService
     List<ACL> zkAcls = RMZKUtils.getZKAcls(conf);
     List<ZKUtil.ZKAuthInfo> zkAuths = RMZKUtils.getZKAuths(conf);
 
+    // 设置ActiveStandbyElector选举操作重试的最大次数，默认是3
     int maxRetryNum = conf.getInt(
         CommonConfigurationKeys.HA_FC_ELECTOR_ZK_OP_RETRIES_KEY,
         CommonConfigurationKeys.HA_FC_ELECTOR_ZK_OP_RETRIES_DEFAULT);
+    // 创建ActiveStandbyElector对象
     elector = new ActiveStandbyElector(zkQuorum, (int) zkSessionTimeout,
         electionZNode, zkAcls, zkAuths, this, maxRetryNum);
 
@@ -176,6 +180,14 @@ public class EmbeddedElectorService extends AbstractService
         .toByteArray();
   }
 
+  /**
+   * 对保存选举锁节点的父节点进行安全性检查：1、检查父节点是否已经在ZK中存在；2、如果存在，检查clusterId是否一致，不一致，则记录异常说明存在另外一个集群的选举信息
+   * @param clusterId
+   * @return
+   * @throws InterruptedException
+   * @throws IOException
+   * @throws KeeperException
+   */
   private boolean isParentZnodeSafe(String clusterId)
       throws InterruptedException, IOException, KeeperException {
     byte[] data;

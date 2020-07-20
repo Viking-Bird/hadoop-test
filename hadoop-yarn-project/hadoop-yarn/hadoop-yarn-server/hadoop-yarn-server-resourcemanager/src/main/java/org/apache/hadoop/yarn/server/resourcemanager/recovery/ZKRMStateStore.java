@@ -71,7 +71,7 @@ import java.util.List;
  */
 @Private
 @Unstable
-    public class ZKRMStateStore extends RMStateStore {
+public class ZKRMStateStore extends RMStateStore {
 
     public static final Log LOG = LogFactory.getLog(ZKRMStateStore.class);
     private final SecureRandom random = new SecureRandom();
@@ -223,7 +223,7 @@ import java.util.List;
         }
         numRetries =
                 conf.getInt(YarnConfiguration.RM_ZK_NUM_RETRIES,
-                        YarnConfiguration.DEFAULT_ZK_RM_NUM_RETRIES); // ZK连接丢失时，重试连接ZK的次数
+                        YarnConfiguration.DEFAULT_ZK_RM_NUM_RETRIES); // ZK连接丢失时，重试连接ZK的次数，默认1000
         znodeWorkingPath =
                 conf.get(YarnConfiguration.ZK_RM_STATE_STORE_PARENT_PATH,
                         YarnConfiguration.DEFAULT_ZK_RM_STATE_STORE_PARENT_PATH); // 保存RM State的ZK路径
@@ -250,8 +250,9 @@ import java.util.List;
         rmAppRoot = getNodePath(zkRootNodePath, RM_APP_ROOT); // 获取任务信息存储路径，如：/rmstore/ZKRMStateRoot/RMAppRoot/
 
         /* Initialize fencing related paths, acls, and ops */
-        // 构建创建和删除fencingNodePath的操作对象
+        // 隔离锁，路径为/rmstore/ZKRMStateRoot/RM_ZK_FENCING_LOCK
         fencingNodePath = getNodePath(zkRootNodePath, FENCING_LOCK);
+        // 构建创建和删除fencingNodePath的操作对象
         createFencingNodePathOp = Op.create(fencingNodePath, new byte[0], zkAcl,
                 CreateMode.PERSISTENT);
         deleteFencingNodePathOp = Op.delete(fencingNodePath, -1);
@@ -298,6 +299,7 @@ import java.util.List;
         // ensure root dirs exist
         createRootDir(znodeWorkingPath); // 创建保存任务状态持久化节点
         createRootDir(zkRootNodePath);
+        // HA状态下，启动Active状态验证线程
         if (HAUtil.isHAEnabled(getConfig())) {
             fence();
             verifyActiveStatusThread = new VerifyActiveStatusThread();
@@ -1104,7 +1106,7 @@ import java.util.List;
     /**
      * 创建、更新、删除操作都会在实际操作之前创建RM_ZK_FENCING_LOCK的文件，操作完成之后则删除对应的文件，multi中的操作是事务性的，这样意味着同时只有一个client去写rmstore目录，
      * 当有两个rm同时写，创建RM_ZK_FENCING_LOCK时则会抛出异常，同时rm则会捕获异常，并将自己的状态转化为standby的状态。
-     *
+     * <p>
      * Helper method that creates fencing node, executes the passed operations,
      * and deletes the fencing node.
      */
@@ -1225,6 +1227,7 @@ import java.util.List;
     }
 
     /**
+     * RM Active状态验证线程，周期性地尝试创建一个空节点来确保RM是Active状态
      * Helper class that periodically attempts creating a znode to ensure that
      * this RM continues to be the Active.
      */
@@ -1338,6 +1341,12 @@ import java.util.List;
         }
     }
 
+    /**
+     * 创建ZK连接
+     *
+     * @throws IOException
+     * @throws InterruptedException
+     */
     private synchronized void createConnection()
             throws IOException, InterruptedException {
         closeZkClients();
