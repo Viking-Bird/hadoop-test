@@ -52,7 +52,7 @@ public class EmbeddedElectorService extends AbstractService
 
   private RMContext rmContext;
 
-  private byte[] localActiveNodeInfo;
+  private byte[] localActiveNodeInfo; // 参与选举的节点标识：clusterId+rmId
   private ActiveStandbyElector elector;
 
   EmbeddedElectorService(RMContext rmContext) {
@@ -77,6 +77,7 @@ public class EmbeddedElectorService extends AbstractService
     String rmId = HAUtil.getRMHAId(conf);
     // 读取集群ID属性，也就是yarn.resourcemanager.cluster-id的值
     String clusterId = YarnConfiguration.getClusterId(conf);
+
     localActiveNodeInfo = createActiveNodeInfo(clusterId, rmId);
 
     // 设置YARN选举的父ZNode，默认值是/yarn-leader-election

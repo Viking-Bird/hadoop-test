@@ -746,6 +746,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
   }
 
+  /**
+   * 处理RMFatalEvent事件，调用ExitUtil.terminate方法退出进程
+   */
   @Private
   public static class RMFatalEventDispatcher
       implements EventHandler<RMFatalEvent> {

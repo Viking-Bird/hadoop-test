@@ -20,11 +20,18 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * 封装与ZK操作相关的事件
+ */
 @InterfaceAudience.Private
 public enum RMFatalEventType {
+
+
+  // RMStateStore操作ZK失败事件
   // Source <- Store
   STATE_STORE_OP_FAILED,
 
+  // ZK主备选举失败事件
   // Source <- Embedded Elector
   EMBEDDED_ELECTOR_FAILED
 }
