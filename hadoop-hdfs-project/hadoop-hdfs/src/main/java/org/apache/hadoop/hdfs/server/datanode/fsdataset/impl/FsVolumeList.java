@@ -305,7 +305,8 @@ class FsVolumeList {
 
   void addBlockPool(final String bpid, final Configuration conf) throws IOException {
     long totalStartTime = Time.monotonicNow();
-    
+
+    // 保存IO异常信息
     final List<IOException> exceptions = Collections.synchronizedList(
         new ArrayList<IOException>());
     // 给FsVolumeImpl启动一个个线程添加副本
@@ -331,6 +332,7 @@ class FsVolumeList {
       blockPoolAddingThreads.add(t);
       t.start();
     }
+    // 等待线程执行完成
     for (Thread t : blockPoolAddingThreads) {
       try {
         t.join();
