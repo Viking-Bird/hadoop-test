@@ -1330,6 +1330,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     dir.disableQuotaChecks();
     editLogTailer = new EditLogTailer(this, conf);
     editLogTailer.start();
+    // 如果dfs.ha.standby.checkpoints参数为true，则开启checkpointer线程，定期执行checkpoint操作
     if (standbyShouldCheckpoint) {
       standbyCheckpointer = new StandbyCheckpointer(conf, this);
       standbyCheckpointer.start();

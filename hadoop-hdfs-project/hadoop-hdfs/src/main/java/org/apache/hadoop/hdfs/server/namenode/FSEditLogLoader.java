@@ -149,6 +149,16 @@ public class FSEditLogLoader {
     }
   }
 
+  /**
+   * 从编辑日志输入流in中读取一个操作符op，然后调用applyEditLogOp()方法，将操作符作用于内存元数据FSNamesystem
+   * @param in
+   * @param closeOnExit
+   * @param expectedStartingTxId
+   * @param startOpt
+   * @param recovery
+   * @return
+   * @throws IOException
+   */
   long loadEditRecords(EditLogInputStream in, boolean closeOnExit,
       long expectedStartingTxId, StartupOption startOpt,
       MetaRecoveryContext recovery) throws IOException {
@@ -183,6 +193,7 @@ public class FSEditLogLoader {
         try {
           FSEditLogOp op;
           try {
+            // 解析输入流中的操作符，直到输入流为空退出循环
             op = in.readOp();
             if (op == null) {
               break;
@@ -316,6 +327,16 @@ public class FSEditLogLoader {
     return inodeId;
   }
 
+  /**
+   * 将操作符作用于内存元数据FSNamesystem
+   * @param op
+   * @param fsDir
+   * @param startOpt
+   * @param logVersion
+   * @param lastInodeId
+   * @return
+   * @throws IOException
+   */
   @SuppressWarnings("deprecation")
   private long applyEditLogOp(FSEditLogOp op, FSDirectory fsDir,
       StartupOption startOpt, int logVersion, long lastInodeId) throws IOException {

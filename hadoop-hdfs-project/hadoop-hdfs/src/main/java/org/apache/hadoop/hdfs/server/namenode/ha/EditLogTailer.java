@@ -119,7 +119,7 @@ public class EditLogTailer {
     // 取参数dfs.ha.log-roll.period，参数未配置默认为2min
     logRollPeriodMs = conf.getInt(DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY,
         DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_DEFAULT) * 1000;
-    if (logRollPeriodMs >= 0) { // 当获取滚动日志时间间隔大于0的话，获取Active NameNode的地址
+    if (logRollPeriodMs >= 0) { // 滚动日志时间间隔大于0的话，获取Active NameNode的地址，否则打印输出日志，表示不支持editlog滚动
       this.activeAddr = getActiveNodeAddress();
       Preconditions.checkArgument(activeAddr.getPort() > 0,
           "Active NameNode must have an IPC port configured. " +
@@ -320,7 +320,8 @@ public class EditLogTailer {
         try {
           // There's no point in triggering a log roll if the Standby hasn't
           // read any more transactions since the last time a roll was
-          // triggered. 
+          // triggered.
+          // 判断是否需要滚动editlog
           if (tooLongSinceLastLoad() &&
               lastRollTriggerTxId < lastLoadedTxnId) {
             triggerActiveLogRoll();
@@ -334,6 +335,7 @@ public class EditLogTailer {
           if (!shouldRun) {
             break;
           }
+          // 获取最新的editlog
           doTailEdits();
         } catch (EditLogInputException elie) {
           LOG.warn("Error while reading edits from disk. Will try again.", elie);
