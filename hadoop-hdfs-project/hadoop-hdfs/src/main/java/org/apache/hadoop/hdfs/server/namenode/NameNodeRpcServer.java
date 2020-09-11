@@ -177,6 +177,7 @@ import com.google.common.collect.Lists;
 import com.google.protobuf.BlockingService;
 
 /**
+ * 负责处理NameNode的RPC调用操作
  * This class is responsible for handling all of the RPC calls to the NameNode.
  * It is created, started, and stopped by {@link NameNode}.
  */
@@ -187,7 +188,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
   private static final Log blockStateChangeLog = NameNode.blockStateChangeLog;
   
   // Dependencies from other parts of NN.
-  protected final FSNamesystem namesystem;
+  protected final FSNamesystem namesystem; // 执行文件读写、记录editlog和auditlog操作
   protected final NameNode nn;
   private final NameNodeMetrics metrics;
   
@@ -850,6 +851,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
       throw new IOException("mkdirs: Pathname too long.  Limit " 
                             + MAX_PATH_LENGTH + " characters, " + MAX_PATH_DEPTH + " levels.");
     }
+    // 调用FSNamesystem的mkdirs执行创建目录操作
     return namesystem.mkdirs(src,
         new PermissionStatus(getRemoteUser().getShortUserName(),
             null, masked), createParent);

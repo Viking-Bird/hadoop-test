@@ -98,6 +98,8 @@ import com.google.common.collect.Lists;
 import org.apache.hadoop.security.AccessControlException;
 
 /**
+ * FSDirectory纯内存操作，维护内存中的目录树
+ * FSNamesystem负责持久化操作，会调用FSDirectory方法更新目录树，并记录editlog和aduitlog
  * Both FSDirectory and FSNamesystem manage the state of the namespace.
  * FSDirectory is a pure in-memory data structure, all of whose operations
  * happen entirely in memory. In contrast, FSNamesystem persists the operations

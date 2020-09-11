@@ -4310,7 +4310,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
       writeUnlock();
     }
     getEditLog().logSync(); // 同步editlog日志
-    if (status) {
+    if (status) { // 创建成功，记录审计日志
       logAuditEvent(true, "mkdirs", srcArg, null, resultingStat);
     }
     return status;
@@ -4376,7 +4376,7 @@ public class FSNamesystem implements Namesystem, FSClusterStats,
     byte[][] components = INode.getPathComponents(names);
     final int lastInodeIndex = components.length - 1;
 
-    dir.writeLock();
+    dir.writeLock(); // 加写锁
     try {
       INodesInPath iip = dir.getExistingPathINodes(components);
       if (iip.isSnapshot()) {
