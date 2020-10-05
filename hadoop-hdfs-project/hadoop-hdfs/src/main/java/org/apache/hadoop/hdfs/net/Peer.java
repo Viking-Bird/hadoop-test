@@ -26,6 +26,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.net.unix.DomainSocket;
 
 /**
+ * 标识一个客户端连接
  * Represents a connection to a peer.
  */
 @InterfaceAudience.Private

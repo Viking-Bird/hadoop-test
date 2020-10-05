@@ -353,7 +353,8 @@ public class DFSOutputStream extends FSOutputSummer
     }
   }
 
-  //
+  // DataStreamer 是 Client 中负责数据传输的独立线程，当发现队列中有 DFSPacket 时，
+  // 先通过 namenode.addBlock 从 NameNode 中获取可供传输的 DataNode 信息，然后同指定的 DataNode 进行数据传输。
   // The DataStreamer class is responsible for sending data packets to the
   // datanodes in the pipeline. It retrieves a new blockid and block locations
   // from the namenode, and starts streaming packets to the pipeline of
@@ -464,7 +465,7 @@ public class DFSOutputStream extends FSOutputSummer
         // if the remaining space in the block is smaller than 
         // that expected size of of a packet, then create 
         // smaller size packet.
-        //
+        // 计算数据包块大小
         computePacketChunkSize(Math.min(dfsClient.getConf().writePacketSize, freeInLastBlock), 
             bytesPerChecksum);
       }

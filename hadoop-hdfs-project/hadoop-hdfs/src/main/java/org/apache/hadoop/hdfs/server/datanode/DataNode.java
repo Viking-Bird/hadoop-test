@@ -279,7 +279,7 @@ public class DataNode extends ReconfigurableBase
     return NetUtils.createSocketAddr(target);
   }
   
-  volatile boolean shouldRun = true;
+  volatile boolean shouldRun = true; // 标识DataNode是否运行
   volatile boolean shutdownForUpgrade = false;
   private boolean shutdownInProgress = false;
   private BlockPoolManager blockPoolManager;
@@ -290,7 +290,7 @@ public class DataNode extends ReconfigurableBase
   final AtomicInteger xmitsInProgress = new AtomicInteger();
   Daemon dataXceiverServer = null;
   DataXceiverServer xserver = null;
-  Daemon localDataXceiverServer = null;
+  Daemon localDataXceiverServer = null; // 用于本地进程通信
   ShortCircuitRegistry shortCircuitRegistry = null;
   ThreadGroup threadGroup = null;
   private DNConf dnConf;
@@ -871,21 +871,26 @@ public class DataNode extends ReconfigurableBase
       tcpPeerServer = new TcpPeerServer(dnConf.socketWriteTimeout,
           DataNode.getStreamingAddr(conf));
     }
+    // 设置TCP接收缓冲区
     tcpPeerServer.setReceiveBufferSize(HdfsConstants.DEFAULT_DATA_SOCKET_SIZE);
     streamingAddr = tcpPeerServer.getStreamingAddr();
     LOG.info("Opened streaming server at " + streamingAddr);
     this.threadGroup = new ThreadGroup("dataXceiverServer");
+    // 构造DataXceiverServer对象
     xserver = new DataXceiverServer(tcpPeerServer, conf, this);
     this.dataXceiverServer = new Daemon(threadGroup, xserver);
     this.threadGroup.setDaemon(true); // auto destroy when empty
 
+    // 短路读取情况
     if (conf.getBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
               DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT) ||
         conf.getBoolean(DFSConfigKeys.DFS_CLIENT_DOMAIN_SOCKET_DATA_TRAFFIC,
               DFSConfigKeys.DFS_CLIENT_DOMAIN_SOCKET_DATA_TRAFFIC_DEFAULT)) {
+      // 构造DomainPeerServer（底层依赖于DomainSocket，用于本地进程间通信）
       DomainPeerServer domainPeerServer =
                 getDomainPeerServer(conf, streamingAddr.getPort());
       if (domainPeerServer != null) {
+        // 构造localDataXceiverServer
         this.localDataXceiverServer = new Daemon(threadGroup,
             new DataXceiverServer(domainPeerServer, conf, this));
         LOG.info("Listening on UNIX domain socket: " +
@@ -1077,12 +1082,17 @@ public class DataNode extends ReconfigurableBase
     LOG.info("Starting DataNode with maxLockedMemory = " +
         dnConf.maxLockedMemory);
 
+    // 初始化DataStorage
     storage = new DataStorage();
     
     // global DN settings
+    // 注册JMX
     registerMXBean();
+    // 初始化DataXceiver（流式通信），DataNode#runDatanodeDaemon()中启动
     initDataXceiver(conf);
+    // 启动InfoServer（Web UI）
     startInfoServer(conf);
+    // 启动JVMPauseMonitor（反向监控JVM情况，可通过JMX查询）
     pauseMonitor = new JvmPauseMonitor(conf);
     pauseMonitor.start();
   
@@ -1093,11 +1103,13 @@ public class DataNode extends ReconfigurableBase
     dnUserName = UserGroupInformation.getCurrentUser().getShortUserName();
     LOG.info("dnUserName = " + dnUserName);
     LOG.info("supergroup = " + supergroup);
+    // 初始化IpcServer（RPC通信），DataNode#runDatanodeDaemon()中启动
     initIpcServer(conf);
 
     metrics = DataNodeMetrics.create(conf, getDisplayName());
     metrics.getJvmMetrics().setPauseMonitor(pauseMonitor);
-    
+
+    // 按照namespace（nameservice）、namenode的二级结构进行初始化
     blockPoolManager = new BlockPoolManager(this);
     blockPoolManager.refreshNamenodes(conf);
 
@@ -1296,18 +1308,24 @@ public class DataNode extends ReconfigurableBase
     
     setClusterId(nsInfo.clusterID, nsInfo.getBlockPoolID());
 
+    // 将blockpool注册到BlockPoolManager
     // Register the new block pool with the BP manager.
     blockPoolManager.addBlockPool(bpos);
-    
+
+    // 初步初始化存储结构
     // In the case that this is the first block pool to connect, initialize
     // the dataset, block scanners, etc.
     initStorage(nsInfo);
 
     // Exclude failed disks before initializing the block pools to avoid startup
     // failures.
+    // 检查磁盘损坏
     checkDiskError();
 
+    // 将blockpool添加到FsDatasetIpml，并继续初始化存储结构
     data.addBlockPool(nsInfo.getBlockPoolID(), conf);
+
+    // 启动扫描器
     initPeriodicScanners(conf);
   }
 
@@ -2154,7 +2172,9 @@ public class DataNode extends ReconfigurableBase
     }
   }
 
-  /** Start a single datanode daemon and wait for it to finish.
+  /**
+   * 启动剩余的DataXceiverServer、localDataXceiverServer、IpcServer等
+   * Start a single datanode daemon and wait for it to finish.
    *  If this thread is specifically interrupted, it will stop waiting.
    */
   public void runDatanodeDaemon() throws IOException {
@@ -2208,6 +2228,7 @@ public class DataNode extends ReconfigurableBase
       printUsage(System.err);
       return null;
     }
+    // 获取DataNode数据存储路径
     Collection<StorageLocation> dataLocations = getStorageLocations(conf);
     UserGroupInformation.setConfiguration(conf);
     SecurityUtil.login(conf, DFS_DATANODE_KEYTAB_FILE_KEY,
@@ -2259,8 +2280,10 @@ public class DataNode extends ReconfigurableBase
   @InterfaceAudience.Private
   public static DataNode createDataNode(String args[], Configuration conf,
       SecureResources resources) throws IOException {
+    // 完成大部分初始化的工作，并启动部分工作线程
     DataNode dn = instantiateDataNode(args, conf, resources);
     if (dn != null) {
+      // 启动剩余工作线程
       dn.runDatanodeDaemon();
     }
     return dn;
@@ -2435,6 +2458,7 @@ public class DataNode extends ReconfigurableBase
     int errorCode = 0;
     try {
       StringUtils.startupShutdownMessage(DataNode.class, args, LOG);
+      // 完成创建datanode的主要工作
       DataNode datanode = createDataNode(args, null, resources);
       if (datanode != null) {
         datanode.join();

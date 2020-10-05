@@ -218,14 +218,17 @@ class BPServiceActor implements Runnable {
 
     // First phase of the handshake with NN - get the namespace
     // info.
+    // 先通过第一次握手获得namespace的信息
     NamespaceInfo nsInfo = retrieveNamespaceInfo();
     
     // Verify that this matches the other NN in this HA pair.
     // This also initializes our block pool in the DN if we are
     // the first NN connection for this BP.
+    // 然后验证并初始化该datanode上的BlockPool
     bpos.verifyAndSetNamespaceInfo(nsInfo);
     
     // Second phase of the handshake with the NN.
+    // 最后，通过第二次握手向各namespace注册自己
     register();
   }
 
@@ -864,6 +867,7 @@ class BPServiceActor implements Runnable {
         // init stuff
         try {
           // setup storage
+          // 与namonode握手，注册
           connectToNNAndHandshake();
           break;
         } catch (IOException ioe) {
@@ -886,6 +890,7 @@ class BPServiceActor implements Runnable {
 
       while (shouldRun()) {
         try {
+          // BPServiceActor提供的服务
           offerService();
         } catch (Exception ex) {
           LOG.error("Exception in BPOfferService for " + this, ex);

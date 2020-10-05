@@ -232,11 +232,12 @@ public class Client {
    * If ping is not enabled (via ipc.client.ping), then the timeout value is the 
    * same as the pingInterval.
    * If ping is enabled, then there is no timeout value.
-   * 
+   * 如果开启了ping机制，就不超时。否则超时时间就是ping的周期1分钟。
    * @param conf Configuration
    * @return the timeout period in milliseconds. -1 if no timeout value is set
    */
   final public static int getTimeout(Configuration conf) {
+    // 检查是否开启client与server之间的ping机制
     if (!conf.getBoolean(CommonConfigurationKeys.IPC_CLIENT_PING_KEY, true)) {
       return getPingInterval(conf);
     }

@@ -350,6 +350,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
       maxBlockAcquireFailures = conf.getInt(
           DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_KEY,
           DFS_CLIENT_MAX_BLOCK_ACQUIRE_FAILURES_DEFAULT);
+      // DataNode写超时时间
       confTime = conf.getInt(DFS_DATANODE_SOCKET_WRITE_TIMEOUT_KEY,
           HdfsServerConstants.WRITE_TIMEOUT);
       ioBufferSize = conf.getInt(
@@ -771,7 +772,7 @@ public class DFSClient implements java.io.Closeable, RemotePeerFactory,
 
   /**
    * Return the timeout that clients should use when writing to datanodes.
-   * @param numNodes the number of nodes in the pipeline.
+   * @param numNodes the number of nodes in the pipeline. 管道中节点的数量
    */
   int getDatanodeWriteTimeout(int numNodes) {
     return (dfsClientConf.confTime > 0) ?

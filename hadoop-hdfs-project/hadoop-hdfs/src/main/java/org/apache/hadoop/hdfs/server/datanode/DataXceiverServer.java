@@ -132,9 +132,11 @@ class DataXceiverServer implements Runnable {
     Peer peer = null;
     while (datanode.shouldRun && !datanode.shutdownForUpgrade) {
       try {
+        // 监听客户端连接，来一个连接就创建一个DataXceiver线程
         peer = peerServer.accept();
 
         // Make sure the xceiver count is not exceeded
+        // 检查DataXceiver线程的数量，超过最大限制就抛出IOE
         int curXceiverCount = datanode.getXceiverCount();
         if (curXceiverCount > maxXceiverCount) {
           throw new IOException("Xceiver count " + curXceiverCount
@@ -142,6 +144,7 @@ class DataXceiverServer implements Runnable {
               + maxXceiverCount);
         }
 
+        // 启动一个新的DataXceiver线程
         new Daemon(datanode.threadGroup,
             DataXceiver.create(peer, datanode, this))
             .start();
@@ -154,9 +157,11 @@ class DataXceiverServer implements Runnable {
           LOG.warn(datanode.getDisplayName() + ":DataXceiverServer: ", ace);
         }
       } catch (IOException ie) {
+        // 清理
         IOUtils.cleanup(null, peer);
         LOG.warn(datanode.getDisplayName() + ":DataXceiverServer: ", ie);
       } catch (OutOfMemoryError ie) {
+        // 清理并sleep 30s
         IOUtils.cleanup(null, peer);
         // DataNode can run out of memory if there is too many transfers.
         // Log the event, Sleep for 30 seconds, other transfers may complete by
@@ -168,6 +173,7 @@ class DataXceiverServer implements Runnable {
           // ignore
         }
       } catch (Throwable te) {
+        // 其他异常就关闭datanode
         LOG.error(datanode.getDisplayName()
             + ":DataXceiverServer: Exiting due to: ", te);
         datanode.shouldRun = false;
@@ -176,6 +182,7 @@ class DataXceiverServer implements Runnable {
 
     // Close the server to stop reception of more requests.
     try {
+      // 关闭peerServer并清理所有peers
       peerServer.close();
       closed = true;
     } catch (IOException ie) {

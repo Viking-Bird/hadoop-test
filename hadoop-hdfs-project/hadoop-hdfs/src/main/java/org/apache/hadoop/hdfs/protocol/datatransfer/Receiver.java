@@ -64,7 +64,10 @@ public abstract class Receiver implements DataTransferProtocol {
     return Op.read(in);
   }
 
-  /** Process op by the corresponding method. */
+  /**
+   *  根据op码来执行具体的操作
+   *  Process op by the corresponding method.
+   */
   protected final void processOp(Op op) throws IOException {
     switch(op) {
     case READ_BLOCK:

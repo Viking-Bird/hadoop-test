@@ -212,6 +212,7 @@ public final class HdfsServerConstants {
   }
 
   // Timeouts for communicating with DataNode for streaming writes/reads
+  // DataNode读写超时时间
   public static final int READ_TIMEOUT = 60 * 1000;
   public static final int READ_TIMEOUT_EXTENSION = 5 * 1000;
   public static final int WRITE_TIMEOUT = 8 * 60 * 1000;

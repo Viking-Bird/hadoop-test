@@ -90,6 +90,7 @@ import com.google.protobuf.ByteString;
 
 
 /**
+ * 数据流读写线程
  * Thread for processing incoming/outgoing data stream.
  */
 class DataXceiver extends Receiver implements Runnable {
@@ -201,10 +202,12 @@ class DataXceiver extends Receiver implements Runnable {
       // We process requests in a loop, and stay around for a short timeout.
       // This optimistic behaviour allows the other end to reuse connections.
       // Setting keepalive timeout to 0 disable this behavior.
+      // 使用一个循环，以允许客户端发送新的操作请求时重用TCP连接
       do {
         updateCurrentThreadName("Waiting for operation #" + (opsProcessed + 1));
 
         try {
+          // 超时设置
           if (opsProcessed != 0) {
             assert dnConf.socketKeepaliveTimeout > 0;
             peer.setReadTimeout(dnConf.socketKeepaliveTimeout);
@@ -217,18 +220,20 @@ class DataXceiver extends Receiver implements Runnable {
           break;
         } catch (IOException err) {
           // Since we optimistically expect the next op, it's quite normal to get EOF here.
+          // 此处的优化使得正常处理完一个操作后，一定会抛出EOFException或ClosedChannelException，可以退出循环
           if (opsProcessed > 0 &&
               (err instanceof EOFException || err instanceof ClosedChannelException)) {
             if (LOG.isDebugEnabled()) {
               LOG.debug("Cached " + peer + " closing after " + opsProcessed + " ops");
             }
-          } else {
+          } else { // 如果是其他异常，则说明出现错误，重新抛出以退出循环
             throw err;
           }
           break;
         }
 
         // restore normal timeout
+        // 超时设置
         if (opsProcessed != 0) {
           peer.setReadTimeout(dnConf.socketTimeout);
         }
@@ -238,7 +243,7 @@ class DataXceiver extends Receiver implements Runnable {
         ++opsProcessed;
       } while ((peer != null) &&
           (!peer.isClosed() && dnConf.socketKeepaliveTimeout > 0));
-    } catch (Throwable t) {
+    } catch (Throwable t) { // 异常处理
       String s = datanode.getDisplayName() + ":DataXceiver error processing "
           + ((op == null) ? "unknown" : op.name()) + " operation "
           + " src: " + remoteAddress + " dst: " + localAddress;
@@ -260,7 +265,7 @@ class DataXceiver extends Receiver implements Runnable {
             + datanode.getXceiverCount());
       }
       updateCurrentThreadName("Cleaning up");
-      if (peer != null) {
+      if (peer != null) { // 关闭客户端连接和IO流
         dataXceiverServer.closePeer(peer);
         IOUtils.closeStream(in);
       }
@@ -571,6 +576,26 @@ class DataXceiver extends Receiver implements Runnable {
     datanode.metrics.incrReadsFromClient(peer.isLocal());
   }
 
+  /**
+   * 写数据块
+   * @param block
+   * @param storageType for storing the replica in the receiver datanode.
+   * @param blockToken security token for accessing the block.
+   * @param clientname
+   * @param targets other downstream datanodes in the pipeline.
+   * @param targetStorageTypes target {@link StorageType}s corresponding
+   *                           to the target datanodes.
+   * @param srcDataNode
+   * @param stage pipeline stage.
+   * @param pipelineSize the size of the pipeline.
+   * @param minBytesRcvd minimum number of bytes received.
+   * @param maxBytesRcvd maximum number of bytes received.
+   * @param latestGenerationStamp the latest generation stamp of the block.
+   * @param requestedChecksum
+   * @param cachingStrategy
+   * @param allowLazyPersist
+   * @throws IOException
+   */
   @Override
   public void writeBlock(final ExtendedBlock block,
       final StorageType storageType, 
@@ -643,6 +668,7 @@ class DataXceiver extends Receiver implements Runnable {
       if (isDatanode || 
           stage != BlockConstructionStage.PIPELINE_CLOSE_RECOVERY) {
         // open a block receiver
+        // 创建BlockReceiver，准备接收数据块
         blockReceiver = new BlockReceiver(block, storageType, in,
             peer.getRemoteAddressString(),
             peer.getLocalAddressString(),

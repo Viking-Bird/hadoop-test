@@ -304,6 +304,7 @@ class BPOfferService {
     writeLock();
     try {
       if (this.bpNSInfo == null) {
+        // 如果是第一次连接namenode（也就必然是第一次连接namespace），则初始化blockpool（块池）
         this.bpNSInfo = nsInfo;
         boolean success = false;
 
@@ -311,10 +312,12 @@ class BPOfferService {
         // The DN can now initialize its local storage if we are the
         // first BP to handshake, etc.
         try {
+          // 以BPOfferService为单位初始化blockpool
           dn.initBlockPool(this);
           success = true;
         } finally {
           if (!success) {
+            // 如果一个BPServiceActor线程失败了，还可以由同BPOfferService的其他BPServiceActor线程重新尝试
             // The datanode failed to initialize the BP. We need to reset
             // the namespace info so that other BPService actors still have
             // a chance to set it, and re-initialize the datanode.
