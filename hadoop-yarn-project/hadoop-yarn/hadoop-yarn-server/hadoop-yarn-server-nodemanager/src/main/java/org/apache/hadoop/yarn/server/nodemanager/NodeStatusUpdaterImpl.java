@@ -74,6 +74,9 @@ import org.apache.hadoop.yarn.util.YarnVersionInfo;
 
 import com.google.common.annotations.VisibleForTesting;
 
+/**
+ * 负责向RM发送心跳
+ */
 public class NodeStatusUpdaterImpl extends AbstractService implements
     NodeStatusUpdater {
 

@@ -61,16 +61,17 @@ public interface Schedulable {
    * Maximum number of resources required by this Schedulable. This is defined as
    * number of currently utilized resources + number of unlaunched resources (that
    * are either not yet launched or need to be speculated).
+   * 当前的最大资源，包括已使用的资源和任务运行未获得的资源
    */
   public Resource getDemand();
 
-  /** Get the aggregate amount of resources consumed by the schedulable. */
+  /** Get the aggregate amount of resources consumed by the schedulable. 已使用的总资源*/
   public Resource getResourceUsage();
 
-  /** Minimum Resource share assigned to the schedulable. */
+  /** Minimum Resource share assigned to the schedulable. 已分配的最小资源 */
   public Resource getMinShare();
 
-  /** Maximum Resource share assigned to the schedulable. */
+  /** Maximum Resource share assigned to the schedulable. 已分配的最大资源*/
   public Resource getMaxShare();
 
   /** Job/queue weight in fair sharing. */
@@ -87,7 +88,7 @@ public interface Schedulable {
 
   /**
    * Assign a container on this node if possible, and return the amount of
-   * resources assigned.
+   * resources assigned. 给节点分配container，并返回已分配资源的数量
    */
   public Resource assignContainer(FSSchedulerNode node);
 
@@ -96,9 +97,9 @@ public interface Schedulable {
    */
   public RMContainer preemptContainer();
 
-  /** Get the fair share assigned to this Schedulable. */
+  /** Get the fair share assigned to this Schedulable. 返回调度对象的共享资源数量 */
   public Resource getFairShare();
 
-  /** Assign a fair share to this Schedulable. */
+  /** Assign a fair share to this Schedulable. 给调度对象分配共享资源*/
   public void setFairShare(Resource fairShare);
 }

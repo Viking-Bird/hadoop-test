@@ -110,6 +110,7 @@ public class CompositeService extends AbstractService {
   }
 
   protected void serviceStart() throws Exception {
+    // 获取在init初始化节点注册的service，然后挨个启动
     List<Service> services = getServices();
     if (LOG.isDebugEnabled()) {
       LOG.debug(getName() + ": starting services, size=" + services.size());

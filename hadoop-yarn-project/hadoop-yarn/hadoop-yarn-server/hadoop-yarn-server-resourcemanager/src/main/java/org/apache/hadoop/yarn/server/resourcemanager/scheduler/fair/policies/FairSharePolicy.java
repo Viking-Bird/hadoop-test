@@ -72,6 +72,7 @@ public class FairSharePolicy extends SchedulingPolicy {
     public int compare(Schedulable s1, Schedulable s2) {
       double minShareRatio1, minShareRatio2;
       double useToWeightRatio1, useToWeightRatio2;
+      // 计算两个队列各自的资源使用量 < min(资源需求量,最小份额），即是否饥饿。
       Resource minShare1 = Resources.min(RESOURCE_CALCULATOR, null,
           s1.getMinShare(), s1.getDemand());
       Resource minShare2 = Resources.min(RESOURCE_CALCULATOR, null,
@@ -80,25 +81,27 @@ public class FairSharePolicy extends SchedulingPolicy {
           s1.getResourceUsage(), minShare1);
       boolean s2Needy = Resources.lessThan(RESOURCE_CALCULATOR, null,
           s2.getResourceUsage(), minShare2);
+      //计算资源分配比，分母不会小于1：已使用内存/ 最小资源保证
       minShareRatio1 = (double) s1.getResourceUsage().getMemory()
           / Resources.max(RESOURCE_CALCULATOR, null, minShare1, ONE).getMemory();
       minShareRatio2 = (double) s2.getResourceUsage().getMemory()
           / Resources.max(RESOURCE_CALCULATOR, null, minShare2, ONE).getMemory();
+      //计算资源使用权值比
       useToWeightRatio1 = s1.getResourceUsage().getMemory() /
           s1.getWeights().getWeight(ResourceType.MEMORY);
       useToWeightRatio2 = s2.getResourceUsage().getMemory() /
           s2.getWeights().getWeight(ResourceType.MEMORY);
       int res = 0;
-      if (s1Needy && !s2Needy)
+      if (s1Needy && !s2Needy) // 若 s1紧需资源（使用资源量小于最小资源保证即紧需资源），s2 紧需资源，把资源给 s1
         res = -1;
-      else if (s2Needy && !s1Needy)
+      else if (s2Needy && !s1Needy) // 若 s2紧需资源，s1 不紧需资源，把资源给 s2
         res = 1;
-      else if (s1Needy && s2Needy)
+      else if (s1Needy && s2Needy) // 若 s1、s2 都紧需资源，把资源给 minShareRatio 更小的，minShareRatio1 = 已使用内存/ 最小资源保证
         res = (int) Math.signum(minShareRatio1 - minShareRatio2);
-      else
+      else // 若 s1、s2 都不紧需资源， 把资源给 useToWeightRatio 更小的, useToWeightRatio = 已使用内存 / 权重
         // Neither schedulable is needy
         res = (int) Math.signum(useToWeightRatio1 - useToWeightRatio2);
-      if (res == 0) {
+      if (res == 0) { //若 s1、s2 都不紧需资源且useToWeightRatio相同，把资源给更早启动的
         // Apps are tied in fairness ratio. Break the tie by submit time and job
         // name to get a deterministic ordering, which is useful for unit tests.
         res = (int) Math.signum(s1.getStartTime() - s2.getStartTime());

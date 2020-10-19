@@ -981,6 +981,7 @@ public class FairScheduler extends
   
   /**
    * Process a heartbeat update from a node.
+   * 处理心跳调度
    */
   private synchronized void nodeUpdate(RMNode nm) {
     long start = getClock().getTime();
@@ -1205,7 +1206,7 @@ public class FairScheduler extends
       NodeRemovedSchedulerEvent nodeRemovedEvent = (NodeRemovedSchedulerEvent)event;
       removeNode(nodeRemovedEvent.getRemovedRMNode());
       break;
-    case NODE_UPDATE:
+    case NODE_UPDATE: // 触发心跳调度，进行资源分配
       if (!(event instanceof NodeUpdateSchedulerEvent)) {
         throw new RuntimeException("Unexpected event type: " + event);
       }
@@ -1330,6 +1331,7 @@ public class FairScheduler extends
       this.eventLog = new FairSchedulerEventLog();
       eventLog.init(this.conf);
 
+      // 获取队列配置初始化队列信息
       allocConf = new AllocationConfiguration(conf);
       try {
         queueMgr.initialize(conf);

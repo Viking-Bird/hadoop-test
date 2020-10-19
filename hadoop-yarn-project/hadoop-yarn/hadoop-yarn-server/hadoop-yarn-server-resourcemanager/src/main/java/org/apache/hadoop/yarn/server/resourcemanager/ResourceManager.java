@@ -199,6 +199,9 @@ public class ResourceManager extends CompositeService implements Recoverable {
     this.configurationProvider.init(this.conf);
     rmContext.setConfigurationProvider(configurationProvider);
 
+    /**
+     * 1、读取配置文件
+     */
     // load core-site.xml
     InputStream coreSiteXMLInputStream =
         this.configurationProvider.getConfigurationInputStream(this.conf,
@@ -244,7 +247,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
     }
 
     // register the handlers for all AlwaysOn services using setupDispatcher().
-    // 注册中央事件处理器
+    // 2、注册中央事件处理器
     rmDispatcher = setupDispatcher();
     addIfService(rmDispatcher);
     rmContext.setDispatcher(rmDispatcher);
@@ -257,6 +260,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
 
     createAndInitActiveServices();
 
+    // 设置web服务地址
     webAppAddress = WebAppUtils.getWebAppBindURL(this.conf,
                       YarnConfiguration.RM_BIND_HOST,
                       WebAppUtils.getRMWebAppURLWithoutScheme(this.conf));
@@ -294,7 +298,7 @@ public class ResourceManager extends CompositeService implements Recoverable {
   }
 
   /**
-   * 根据用户scheduler.class配置创建资源调度器对象
+   * 根据用户scheduler.class配置，反射创建资源调度器对象
    * @return
    */
   protected ResourceScheduler createScheduler() {

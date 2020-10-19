@@ -323,6 +323,7 @@ public class RMAppManager implements EventHandler<RMAppManagerEvent>,
       ApplicationSubmissionContext submissionContext, long submitTime,
       String user, boolean isRecovery) throws YarnException {
     ApplicationId applicationId = submissionContext.getApplicationId();
+    // 重绘application的资源请求
     ResourceRequest amReq =
         validateAndCreateResourceRequest(submissionContext, isRecovery);
 

@@ -21,6 +21,9 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.Resource;
 
+/**
+ * 默认资源计算器：主要计算的是内存
+ */
 @Private
 @Unstable
 public class DefaultResourceCalculator extends ResourceCalculator {
