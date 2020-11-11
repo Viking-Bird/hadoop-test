@@ -136,11 +136,17 @@ public class NodeManager extends CompositeService
         YarnConfiguration.NM_PRINCIPAL);
   }
 
+  /**
+   * 初始化和启动NodeManager状态恢复服务
+   * @param conf
+   * @throws IOException
+   */
   private void initAndStartRecoveryStore(Configuration conf)
       throws IOException {
     boolean recoveryEnabled = conf.getBoolean(
         YarnConfiguration.NM_RECOVERY_ENABLED,
         YarnConfiguration.DEFAULT_NM_RECOVERY_ENABLED);
+    // 如果启用状态恢复，就创建NMLeveldbStateStoreService对象
     if (recoveryEnabled) {
       FileSystem recoveryFs = FileSystem.getLocal(conf);
       String recoveryDirName = conf.get(YarnConfiguration.NM_RECOVERY_DIR);

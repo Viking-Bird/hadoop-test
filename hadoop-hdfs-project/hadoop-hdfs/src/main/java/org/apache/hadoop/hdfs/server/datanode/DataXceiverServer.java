@@ -52,6 +52,7 @@ class DataXceiverServer implements Runnable {
    * Maximal number of concurrent xceivers per node.
    * Enforcing the limit is required in order to avoid data-node
    * running out of memory.
+   * 每个DataNode最大的DataXceiver线程数量，这个限制主要是为了避免DataNode内存溢出
    */
   int maxXceiverCount =
     DFSConfigKeys.DFS_DATANODE_MAX_RECEIVER_THREADS_DEFAULT;

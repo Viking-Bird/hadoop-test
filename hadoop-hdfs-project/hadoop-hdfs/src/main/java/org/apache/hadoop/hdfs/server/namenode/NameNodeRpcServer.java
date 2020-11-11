@@ -279,6 +279,7 @@ class NameNodeRpcServer implements NamenodeProtocols {
       LOG.info("Service RPC server is binding to " + bindHost + ":" +
           serviceRpcAddr.getPort());
 
+      // 获取hand线程数量
       int serviceHandlerCount =
         conf.getInt(DFS_NAMENODE_SERVICE_HANDLER_COUNT_KEY,
                     DFS_NAMENODE_SERVICE_HANDLER_COUNT_DEFAULT);
