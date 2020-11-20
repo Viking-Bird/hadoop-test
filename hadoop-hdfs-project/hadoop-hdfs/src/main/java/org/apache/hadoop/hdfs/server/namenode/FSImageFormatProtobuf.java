@@ -191,6 +191,8 @@ public final class FSImageFormatProtobuf {
       if (!FSImageUtil.checkFileFormat(raFile)) {
         throw new IOException("Unrecognized file format");
       }
+
+      // 读取文件的FileSummary
       FileSummary summary = FSImageUtil.loadSummary(raFile);
       if (requireSameLayoutVersion && summary.getLayoutVersion() !=
           HdfsConstants.NAMENODE_LAYOUT_VERSION) {
@@ -201,6 +203,7 @@ public final class FSImageFormatProtobuf {
 
       FileChannel channel = fin.getChannel();
 
+      // 初始化文件读取加载的加载器
       FSImageFormatPBINode.Loader inodeLoader = new FSImageFormatPBINode.Loader(
           fsn, this);
       FSImageFormatPBSnapshot.Loader snapshotLoader = new FSImageFormatPBSnapshot.Loader(
@@ -231,6 +234,7 @@ public final class FSImageFormatProtobuf {
        */
       Step currentStep = null;
 
+      // 遍历section并调用对应的方法去加载这个section
       for (FileSummary.Section s : sections) {
         channel.position(s.getOffset());
         InputStream in = new BufferedInputStream(new LimitInputStream(fin,
@@ -380,6 +384,12 @@ public final class FSImageFormatProtobuf {
       return saverContext;
     }
 
+      /**
+       * 写完每段Section后，更新索引信息
+       * @param summary
+       * @param name
+       * @throws IOException
+       */
     public void commitSection(FileSummary.Builder summary, SectionName name)
         throws IOException {
       long oldOffset = currentOffset;
@@ -391,8 +401,10 @@ public final class FSImageFormatProtobuf {
         sectionOutputStream = underlyingOutputStream;
       }
       long length = fileChannel.position() - oldOffset;
+      // 保存section索引信息：offset和length
       summary.addSections(FileSummary.Section.newBuilder().setName(name.name)
           .setLength(length).setOffset(currentOffset));
+      // 以当前section的长度累加计算offset
       currentOffset += length;
     }
 
@@ -573,6 +585,7 @@ public final class FSImageFormatProtobuf {
   /**
    * Supported section name. The order of the enum determines the order of
    * loading.
+   * FSImage支持的section名称，枚举的顺序决定了加载的顺序
    */
   public enum SectionName {
     NS_INFO("NS_INFO"),

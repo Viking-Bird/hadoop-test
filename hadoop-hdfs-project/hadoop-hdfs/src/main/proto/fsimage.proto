@@ -63,15 +63,15 @@ message FileSummary {
 }
 
 /**
- * Name: NS_INFO
+ * Name: NS_INFO HDFS文件系统的全局信息
  */
 message NameSystemSection {
-  optional uint32 namespaceId = 1;
+  optional uint32 namespaceId = 1; // NameSystemID
   optional uint64 genstampV1 = 2;
   optional uint64 genstampV2 = 3;
   optional uint64 genstampV1Limit = 4;
-  optional uint64 lastAllocatedBlockId = 5;
-  optional uint64 transactionId = 6;
+  optional uint64 lastAllocatedBlockId = 5; // 当前已经分配出去的最大blockID
+  optional uint64 transactionId = 6; // 当前已经分配出去的最大事务ID
   optional uint64 rollingUpgradeStartTime = 7;
 }
 
@@ -159,6 +159,10 @@ message INodeSection {
     optional uint64 accessTime = 4;
   }
 
+  /**
+  整个目录树所有节点数据，包括INodeFile/INodeDirectory/INodeSymlink等所有类型节点的属性数据，
+  其中记录了如节点ID，节点名称，访问权限，创建和访问时间等等信息
+  */
   message INode {
     enum Type {
       FILE = 1;
@@ -180,6 +184,7 @@ message INodeSection {
 }
 
 /**
+ * 尚未完成写入的文件集合，主要为重启时重建Lease集合；
  * This section records information about under-construction files for
  * reconstructing the lease map.
  * NAME: FILES_UNDERCONSTRUCTION
@@ -226,6 +231,7 @@ message INodeReferenceSection {
 }
 
 /**
+ * 记录Snapshot数据，快照是Hadoop 2.1.0引入的新特性，用于数据备份、回滚，以防止因用户误操作导致集群出现数据问题；
  * This section records the information about snapshot
  * NAME: SNAPSHOT
  */
@@ -244,6 +250,7 @@ message SnapshotSection {
 }
 
 /**
+ * 执行快照操作的目录/文件的Diff集合数据，与SNAPSHOT一起构建较完整的快照管理能力；
  * This section records information about snapshot diffs
  * NAME: SNAPSHOT_DIFF
  */
@@ -288,6 +295,7 @@ message SnapshotDiffSection {
 }
 
 /**
+ * 字符串到ID的映射表，维护目录/文件的Permission字符到ID的映射，节省存储空间。
  * This section maps string to id
  * NAME: STRING_TABLE
  */
@@ -325,6 +333,9 @@ message SecretManagerSection {
   // repeated PersistToken tokens
 }
 
+/**
+ * 集中式缓存特性全局信息，集中式缓存特性是Hadoop-2.3.0为提升数据读性能引入的新特性；
+ */
 message CacheManagerSection {
   required uint64 nextDirectiveId = 1;
   required uint32 numPools        = 2;

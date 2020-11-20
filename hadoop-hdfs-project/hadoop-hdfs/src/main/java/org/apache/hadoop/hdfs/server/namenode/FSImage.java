@@ -757,11 +757,11 @@ public class FSImage implements Closeable {
     Preconditions.checkState(getNamespaceID() != 0,
         "Must know namespace ID before initting edit log");
     String nameserviceId = DFSUtil.getNamenodeNameServiceId(conf);
-    if (!HAUtil.isHAEnabled(conf, nameserviceId)) {
+    if (!HAUtil.isHAEnabled(conf, nameserviceId)) { // 非HA的情况
       // If this NN is not HA
       editLog.initJournalsForWrite();
       editLog.recoverUnclosedStreams();
-    } else if (HAUtil.isHAEnabled(conf, nameserviceId)
+    } else if (HAUtil.isHAEnabled(conf, nameserviceId) // 是HA的情况
         && (startOpt == StartupOption.UPGRADE
             || startOpt == StartupOption.UPGRADEONLY
             || RollingUpgradeStartupOption.ROLLBACK.matches(startOpt))) {

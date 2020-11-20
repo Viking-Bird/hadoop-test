@@ -489,13 +489,16 @@ public final class FSImageFormatPBINode {
     }
 
     void serializeINodeSection(OutputStream out) throws IOException {
+      // 1、获取NameNode内存中保存的文件以及目录的元数据信息INodeMap
       INodeMap inodesMap = fsn.dir.getINodeMap();
 
+      // 2、迭代构造INodeSection，其会先记录当前INodeMap中的所有inode个数，以及最后一个inode对应的inode_id
       INodeSection.Builder b = INodeSection.newBuilder()
           .setLastInodeId(fsn.getLastInodeId()).setNumInodes(inodesMap.size());
       INodeSection s = b.build();
       s.writeDelimitedTo(out);
 
+      // 3、之后便会遍历这个INodeMap中的Inode进行写入
       int i = 0;
       Iterator<INodeWithAdditionalFields> iter = inodesMap.getMapIterator();
       while (iter.hasNext()) {
@@ -506,6 +509,7 @@ public final class FSImageFormatPBINode {
           context.checkCancelled();
         }
       }
+      // 在每段Section写完之后，更新索引信息
       parent.commitSection(summary, FSImageFormatProtobuf.SectionName.INODE);
     }
 
@@ -523,6 +527,12 @@ public final class FSImageFormatPBINode {
           FSImageFormatProtobuf.SectionName.FILES_UNDERCONSTRUCTION);
     }
 
+    /**
+     * 根据对应Inode是 文件INodeFile 或者 目录INodeDirectory 写入不同的元数据信息
+     * @param out
+     * @param n
+     * @throws IOException
+     */
     private void save(OutputStream out, INode n) throws IOException {
       if (n.isDirectory()) {
         save(out, n.asDirectory());
